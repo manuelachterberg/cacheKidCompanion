@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">CacheKid Companion</string>
+    <string name="webview_title">CacheKid Companion Host</string>
+</resources>
