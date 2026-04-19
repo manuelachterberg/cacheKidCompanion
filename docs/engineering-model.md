@@ -120,6 +120,23 @@ Changes merge only through pull requests with:
 
 Do not bypass branch protection to "move faster".
 
+## 8a. Branch cleanup rule
+
+Merged working branches should normally be deleted.
+
+That applies to:
+
+- remote feature or chore branches after the pull request is merged
+- local branches once the merged work is no longer needed for active development
+
+Why:
+
+- it keeps the branch list readable
+- it reduces the chance of continuing work on stale history
+- it makes the current delivery path obvious
+
+Exceptions should be rare and explicit. Long-lived branches should exist only when there is a clear ongoing purpose.
+
 ## 9. Issue slicing rule
 
 A good issue is:
