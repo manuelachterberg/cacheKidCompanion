@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>CacheKid Companion</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Hybrid Navigator</p>
+        <h1>CacheKid Companion</h1>
+      </div>
+      <button id="permissionsButton" class="secondary">Native Zugriff</button>
+    </header>
+
+    <section class="hero-card">
+      <div class="arrow-wrap">
+        <div id="arrow" class="arrow"></div>
+      </div>
+      <div class="stats-grid">
+        <article class="stat-card">
+          <span class="label">Distanz</span>
+          <strong id="distanceValue">--</strong>
+        </article>
+        <article class="stat-card">
+          <span class="label">Heading</span>
+          <strong id="headingValue">--</strong>
+        </article>
+        <article class="stat-card">
+          <span class="label">Ziel-Bearing</span>
+          <strong id="bearingValue">--</strong>
+        </article>
+        <article class="stat-card">
+          <span class="label">Quelle</span>
+          <strong id="sourceValue">Browser</strong>
+        </article>
+      </div>
+    </section>
+
+    <section class="control-panel">
+      <label for="targetInput">Zielkoordinate</label>
+      <input id="targetInput" type="text" value="52.520008,13.404954" spellcheck="false" />
+      <div class="button-row">
+        <button id="targetButton">Ziel setzen</button>
+        <button id="gpsButton" class="secondary">Browser-GPS starten</button>
+        <button id="bleButton" class="secondary">BLE verbinden</button>
+      </div>
+      <p id="statusText" class="status">Bereit. Browser-GPS und native Sensoren koennen parallel genutzt werden.</p>
+    </section>
+
+    <section class="detail-grid">
+      <article class="detail-card">
+        <span class="label">Aktuelle Position</span>
+        <strong id="locationValue">--</strong>
+      </article>
+      <article class="detail-card">
+        <span class="label">Device</span>
+        <strong id="deviceValue">Web</strong>
+      </article>
+    </section>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

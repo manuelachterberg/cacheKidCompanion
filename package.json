@@ -1,0 +1,9 @@
+{
+  "name": "cachekid-companion",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:web": "node --test web-tests/**/*.test.js",
+    "check:web": "node --check app/src/main/assets/web/navigation.js && node --check app/src/main/assets/web/app.js"
+  }
+}
