@@ -21,10 +21,14 @@ import com.cachekid.companion.host.importing.MissionDraftFactory
 import com.cachekid.companion.host.importing.SharedCacheImportResult
 import com.cachekid.companion.host.importing.SharedTextPayload
 import com.cachekid.companion.host.mission.MissionDraft
+import com.cachekid.companion.host.mission.MissionPackageFileStore
+import com.cachekid.companion.host.mission.MissionPackageStoreResult
+import com.cachekid.companion.host.mission.MissionPackageWriter
 import com.cachekid.companion.host.resolution.CacheResolutionResult
 import com.cachekid.companion.host.resolution.HostCacheResolver
 import com.cachekid.companion.host.resolution.ManualCacheResolutionService
 import com.cachekid.companion.web.NativeBridge
+import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
@@ -35,11 +39,14 @@ class MainActivity : AppCompatActivity() {
     private val hostCacheResolver = HostCacheResolver()
     private val manualCacheResolutionService = ManualCacheResolutionService()
     private val missionDraftFactory = MissionDraftFactory()
+    private val missionPackageWriter = MissionPackageWriter()
+    private val missionPackageFileStore = MissionPackageFileStore()
 
     private var pendingImportResult: SharedCacheImportResult? = null
     private var pendingResolutionResult: CacheResolutionResult? = null
     private var pendingMissionDraft: MissionDraft? = null
     private var pendingShareDebug: String? = null
+    private var storedMissionResult: MissionPackageStoreResult? = null
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -88,6 +95,22 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(
                     this,
                     "Mission erstellt.",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+        binding.nativeSaveMissionButton.setOnClickListener {
+            val result = storePendingMissionDraft()
+            if (result?.isSuccess == true) {
+                Toast.makeText(
+                    this,
+                    "Mission lokal gespeichert.",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } else {
+                Toast.makeText(
+                    this,
+                    result?.errors?.firstOrNull() ?: "Mission konnte nicht gespeichert werden.",
                     Toast.LENGTH_SHORT,
                 ).show()
             }
@@ -202,6 +225,7 @@ class MainActivity : AppCompatActivity() {
         pendingImportResult = hostShareImportService.importFrom(payload)
         pendingResolutionResult = pendingImportResult?.value?.let { hostCacheResolver.resolve(it) }
         pendingMissionDraft = pendingResolutionResult?.value?.let { missionDraftFactory.createFrom(it) }
+        storedMissionResult = null
         refreshNativeImportPanel()
         if (::nativeBridge.isInitialized) {
             nativeBridge.notifyImportUpdated()
@@ -228,12 +252,19 @@ class MainActivity : AppCompatActivity() {
         val needsManualResolution =
             pendingMissionDraft == null &&
                 pendingResolutionResult?.status == com.cachekid.companion.host.resolution.CacheResolutionStatus.NEEDS_ONLINE_RESOLUTION
+        val hasDraftReadyMission = pendingMissionDraft != null
 
         binding.nativeImportDebug.visibility = if (needsManualResolution) View.VISIBLE else View.GONE
         binding.nativeImportDebug.text = if (needsManualResolution) debug.orEmpty() else ""
         binding.nativeResolutionTitleInput.visibility = if (needsManualResolution) View.VISIBLE else View.GONE
         binding.nativeResolutionTargetInput.visibility = if (needsManualResolution) View.VISIBLE else View.GONE
         binding.nativeResolveButton.visibility = if (needsManualResolution) View.VISIBLE else View.GONE
+        binding.nativeSaveMissionButton.visibility = if (hasDraftReadyMission) View.VISIBLE else View.GONE
+        binding.nativeStoredMissionStatus.visibility =
+            if (hasDraftReadyMission && storedMissionResult?.isSuccess == true) View.VISIBLE else View.GONE
+        binding.nativeStoredMissionStatus.text = storedMissionResult?.missionDirectory?.let { missionDirectory ->
+            "Gespeichert in: ${missionDirectory.name}"
+        }.orEmpty()
 
         if (needsManualResolution && binding.nativeResolutionTitleInput.text.isNullOrBlank()) {
             binding.nativeResolutionTitleInput.setText(pendingResolutionResult?.cacheCodeHint.orEmpty())
@@ -244,6 +275,10 @@ class MainActivity : AppCompatActivity() {
         if (!needsManualResolution) {
             binding.nativeResolutionTitleInput.text?.clear()
             binding.nativeResolutionTargetInput.text?.clear()
+        }
+        if (!hasDraftReadyMission) {
+            storedMissionResult = null
+            binding.nativeStoredMissionStatus.text = ""
         }
     }
 
@@ -331,6 +366,7 @@ class MainActivity : AppCompatActivity() {
             messages = listOf("Cache manuell vervollstaendigt."),
         )
         pendingMissionDraft = missionDraftFactory.createFrom(resolvedCache)
+        storedMissionResult = null
         refreshNativeImportPanel()
         if (::nativeBridge.isInitialized) {
             nativeBridge.notifyImportUpdated()
@@ -338,7 +374,28 @@ class MainActivity : AppCompatActivity() {
         return pendingMissionDraft
     }
 
+    private fun storePendingMissionDraft(): MissionPackageStoreResult? {
+        val draft = pendingMissionDraft ?: return null
+        val writeResult = missionPackageWriter.write(draft)
+        if (!writeResult.isSuccess) {
+            return MissionPackageStoreResult(
+                missionDirectory = null,
+                errors = writeResult.errors,
+            )
+        }
+
+        val missionPackage = writeResult.missionPackage ?: return null
+        val missionsDirectory = File(filesDir, MISSION_STORAGE_DIRECTORY)
+        storedMissionResult = missionPackageFileStore.store(
+            baseDirectory = missionsDirectory,
+            missionPackage = missionPackage,
+        )
+        refreshNativeImportPanel()
+        return storedMissionResult
+    }
+
     private companion object {
         const val DEFAULT_TARGET_TEXT = "52.520008,13.404954"
+        const val MISSION_STORAGE_DIRECTORY = "missions"
     }
 }

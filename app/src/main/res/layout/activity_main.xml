@@ -71,6 +71,23 @@
             android:layout_marginTop="10dp"
             android:text="Mission manuell anlegen"
             android:visibility="gone" />
+
+        <Button
+            android:id="@+id/nativeSaveMissionButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Mission lokal speichern"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/nativeStoredMissionStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="#5D5D55"
+            android:textSize="12sp"
+            android:visibility="gone" />
     </LinearLayout>
 
 </FrameLayout>
