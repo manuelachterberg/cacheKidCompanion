@@ -22,6 +22,7 @@ import com.cachekid.companion.host.importing.SharedCacheImportResult
 import com.cachekid.companion.host.importing.SharedTextPayload
 import com.cachekid.companion.host.mission.MissionDraft
 import com.cachekid.companion.host.mission.MissionPackageFileStore
+import com.cachekid.companion.host.mission.MissionPackageReceiverServer
 import com.cachekid.companion.host.mission.MissionPackageStoreResult
 import com.cachekid.companion.host.mission.MissionPackageWriter
 import com.cachekid.companion.host.resolution.CacheResolutionResult
@@ -47,6 +48,9 @@ class MainActivity : AppCompatActivity() {
     private var pendingMissionDraft: MissionDraft? = null
     private var pendingShareDebug: String? = null
     private var storedMissionResult: MissionPackageStoreResult? = null
+    private var receiveServer: MissionPackageReceiverServer? = null
+    private var receiveServerRunning: Boolean = false
+    private var receiveStatusText: String = "Empfang aus."
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -115,9 +119,13 @@ class MainActivity : AppCompatActivity() {
                 ).show()
             }
         }
+        binding.nativeReceiveToggleButton.setOnClickListener {
+            toggleReceiveMode()
+        }
 
         handleShareIntent(intent)
         refreshNativeImportPanel()
+        refreshReceivePanel()
         configureWebView(binding.webView)
         binding.webView.loadUrl("file:///android_asset/web/index.html")
     }
@@ -142,6 +150,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        receiveServer?.stop()
         binding.webView.apply {
             removeJavascriptInterface("AndroidHost")
             stopLoading()
@@ -282,6 +291,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun refreshReceivePanel() {
+        binding.nativeReceiveStatus.text = receiveStatusText
+        binding.nativeReceiveToggleButton.text = if (receiveServerRunning) {
+            "Empfang stoppen"
+        } else {
+            "Empfang starten"
+        }
+    }
+
     private fun extractSharedText(intent: android.content.Intent): String? {
         val parts = linkedSetOf<String>()
 
@@ -392,6 +410,32 @@ class MainActivity : AppCompatActivity() {
         )
         refreshNativeImportPanel()
         return storedMissionResult
+    }
+
+    private fun toggleReceiveMode() {
+        if (receiveServerRunning) {
+            receiveServer?.stop()
+            receiveServer = null
+            receiveServerRunning = false
+            receiveStatusText = "Empfang aus."
+            refreshReceivePanel()
+            return
+        }
+
+        val server = MissionPackageReceiverServer(
+            baseDirectory = File(filesDir, MISSION_STORAGE_DIRECTORY),
+            onStatusChanged = { status ->
+                runOnUiThread {
+                    receiveStatusText = status
+                    refreshReceivePanel()
+                }
+            },
+        )
+        val port = server.start()
+        receiveServer = server
+        receiveServerRunning = true
+        receiveStatusText = "Empfang aktiv auf Port $port."
+        refreshReceivePanel()
     }
 
     private companion object {
