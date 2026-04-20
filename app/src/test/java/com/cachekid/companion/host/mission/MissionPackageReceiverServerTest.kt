@@ -21,7 +21,7 @@ class MissionPackageReceiverServerTest {
             port = 0,
             onStatusChanged = { statusMessages.add(it) },
         )
-        val port = server.start()
+        val port = requireNotNull(server.start())
 
         try {
             val missionPackage = requireNotNull(writer.write(validDraft()).missionPackage)

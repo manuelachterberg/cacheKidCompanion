@@ -31,6 +31,7 @@ import com.cachekid.companion.host.mission.MissionPackageStoreResult
 import com.cachekid.companion.host.mission.MissionPackageWriter
 import com.cachekid.companion.host.mission.MissionTargetParser
 import com.cachekid.companion.host.mission.HostMissionBuilderPresenter
+import com.cachekid.companion.host.mission.OfflineMissionMapComposer
 import com.cachekid.companion.host.resolution.CacheResolutionResult
 import com.cachekid.companion.host.resolution.HostCacheResolver
 import com.cachekid.companion.host.resolution.ManualCacheResolutionService
@@ -54,6 +55,7 @@ class MainActivity : AppCompatActivity() {
     private val missionPackageSenderClient = MissionPackageSenderClient()
     private val missionTargetParser = MissionTargetParser()
     private val hostMissionBuilderPresenter = HostMissionBuilderPresenter(missionTargetParser)
+    private val offlineMissionMapComposer = OfflineMissionMapComposer()
     private val activeMissionRepository = ActiveMissionRepository()
 
     private var pendingImportResult: SharedCacheImportResult? = null
@@ -286,7 +288,9 @@ class MainActivity : AppCompatActivity() {
 
         pendingImportResult = hostShareImportService.importFrom(payload)
         pendingResolutionResult = pendingImportResult?.value?.let { hostCacheResolver.resolve(it) }
-        pendingMissionDraft = pendingResolutionResult?.value?.let { missionDraftFactory.createFrom(it) }
+        pendingMissionDraft = pendingResolutionResult?.value
+            ?.let { missionDraftFactory.createFrom(it) }
+            ?.let { offlineMissionMapComposer.prepareDraft(it) }
         storedMissionResult = null
         sendMissionResult = null
         refreshNativeImportPanel()
@@ -464,11 +468,11 @@ class MainActivity : AppCompatActivity() {
     ): MissionDraft? {
         val currentDraft = pendingMissionDraft ?: return null
         val target = missionTargetParser.parse(targetText) ?: return null
-        pendingMissionDraft = currentDraft.copy(
+        pendingMissionDraft = offlineMissionMapComposer.prepareDraft(currentDraft.copy(
             childTitle = childTitle.trim().ifBlank { currentDraft.childTitle },
             summary = summary.trim().ifBlank { currentDraft.summary },
             target = target,
-        )
+        ))
         refreshNativeImportPanel()
         if (::nativeBridge.isInitialized) {
             nativeBridge.notifyImportUpdated()
@@ -494,7 +498,9 @@ class MainActivity : AppCompatActivity() {
             value = resolvedCache,
             messages = listOf("Cache manuell vervollstaendigt."),
         )
-        pendingMissionDraft = missionDraftFactory.createFrom(resolvedCache)
+        pendingMissionDraft = offlineMissionMapComposer.prepareDraft(
+            missionDraftFactory.createFrom(resolvedCache),
+        )
         storedMissionResult = null
         sendMissionResult = null
         refreshNativeImportPanel()

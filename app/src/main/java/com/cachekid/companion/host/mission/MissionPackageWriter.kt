@@ -62,6 +62,7 @@ class MissionPackageWriter(
 
     private fun buildMissionJson(draft: MissionDraft, missionId: String): String {
         val escapedSourceApp = draft.sourceApp?.let { "\"${escapeJson(it)}\"" } ?: "null"
+        val hasOfflineMapAsset = draft.offlineMap?.svgContent?.isNotBlank() == true
         return """
             {
               "schemaVersion": ${MissionPackageSchema.CURRENT_SCHEMA_VERSION},
@@ -75,7 +76,7 @@ class MissionPackageWriter(
                 "longitude": ${draft.target.longitude}
               },
               "sourceApp": $escapedSourceApp,
-              "hasOfflineMap": ${draft.offlineMap != null}
+              "hasOfflineMap": $hasOfflineMapAsset
             }
         """.trimIndent()
     }
