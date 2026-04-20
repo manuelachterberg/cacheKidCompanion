@@ -71,6 +71,7 @@ Examples in this repository:
 
 - native Android versus hybrid architecture
 - smartphone host versus live internet on the Meebook
+- iPhone host versus Android-host prototype code
 - transfer protocol choice
 - offline map stack choice
 - BLE usage boundaries
@@ -222,3 +223,43 @@ It should avoid exposing development-oriented values such as:
 - setup-oriented controls
 
 If a screen needs technical controls, it should default to a parent or debug mode instead of becoming part of the standard child flow.
+
+## 14. Host platform rule
+
+The long-term host platform is the iPhone, not the Android prototype host currently present in the repository.
+
+That means:
+
+- Android host-side flows in this repository should be treated as prototype or reference code unless explicitly reaffirmed
+- new architecture should prefer shared mission-domain code over deeper Android-host-specific expansion
+- Meebook-side work remains first-class Android product work
+
+When host-side design decisions are made, they should be evaluated against:
+
+- iPhone share intake
+- iPhone-side cache resolution
+- cross-platform mission packaging
+- transfer from iPhone host to Android Meebook
+
+## 15. Offline map rule
+
+The intended offline map architecture is:
+
+- the Meebook owns the offline base map
+- missions provide overlays and mission data
+- the runtime should not depend on generating large ad hoc map payloads during mission preparation
+
+Mission-specific generated map assets may exist as prototype code paths, but they should not become hidden architectural defaults.
+
+## 16. Kid map camera rule
+
+The child map should allow a subtle 3D tilt only when it remains e-ink-safe.
+
+That means:
+
+- no aggressive or cinematic tilt
+- low-motion updates
+- static or slowly changing camera behavior
+- readability takes precedence over visual effect
+
+If there is tension between atmosphere and legibility, legibility wins.

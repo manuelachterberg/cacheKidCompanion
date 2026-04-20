@@ -6,14 +6,14 @@ Kid-friendly geocaching companion with e-ink display: follow the arrow, not an a
 
 ## Current state
 
-This repository now contains the first working host-side mission intake flow.
+This repository now contains the first working mission intake, transfer, and kid-mode prototype flow.
 
 Implemented:
 
-- Android host app in Kotlin with a local WebView UI
+- Android kid app in Kotlin with a local WebView UI shell
 - browser-side navigation math for target bearing, distance, and arrow direction
 - browser geolocation fallback
-- Android host bridge with:
+- Android native bridge with:
   - native permission request hook
   - native heading stream from Android rotation sensor
   - native location stream from Android `LocationManager`
@@ -22,7 +22,7 @@ Implemented:
   - `MissionDraft`
   - `MissionTarget`
   - mission package schema and manifest types
-- smartphone host share intake:
+- Android prototype host share intake:
   - `ACTION_SEND` text payloads
   - `coord.info/GC...` links
   - partial vs resolved import states
@@ -30,38 +30,50 @@ Implemented:
   - detect shared cache code
   - manually complete missing title and coordinates
   - create a `MissionDraft`
+- mission package writer, local receiver, and local transfer sender
+- first child-only mission mode prototype on the Meebook
 - simple e-ink-friendly black/white UI
 
 ## Architecture
 
-The current implementation is an Android host app with a WebView-based UI shell.
+The current repository contains two things at once:
 
-The split today is:
+- the actual target runtime: `iPhone host -> Android Meebook kid device`
+- an Android-only prototype host flow that helped define mission intake, packaging, and transfer
 
-- `host domain`
+The Android host path is now reference/prototype code, not the long-term product direction.
+
+The intended split is:
+
+- `iphone host`
+  - cache intake from the Geocaching app
+  - online cache resolution
+  - mission creation
+  - route and waypoint preparation
+  - mission transfer to the Meebook
+- `shared mission domain`
   - cache import parsing
   - resolution state
   - mission draft creation
-- `android host`
-  - intent entrypoint
-  - permission management
-  - native sensor collection
-  - future BLE and e-ink specific integrations
-- `web ui shell`
-  - navigation display
-  - parent-side review widgets
-  - browser geolocation fallback
+  - mission package schema
+- `android meebook kid app`
+  - local package receiver
+  - local mission storage
+  - offline map rendering against a device-local offline map base
+  - route / waypoint / `X` overlays
+  - GPS / heading / BLE sensor integration
+  - child-facing mission UI
 
-The bridge contract is intentionally capability-driven. The UI can fall back to browser features when `window.AndroidHost` is absent, but the smartphone host is the primary runtime for cache intake.
+The bridge contract remains intentionally capability-driven. The WebView UI can still fall back to browser features when `window.AndroidHost` is absent, but the Meebook kid app is the primary Android runtime.
 
 ### Data flow
 
 ```text
-Geocaching App on Smartphone
+Geocaching App on iPhone
         |
         | share link, usually coord.info/GC...
         v
-CacheKid Host App on Smartphone
+CacheKid Host App on iPhone
         |
         | extract GC code
         | resolve cache online
@@ -74,7 +86,7 @@ Local transfer to Meebook
 CacheKid Kid App on Meebook
         |
         | store mission locally
-        | render map, route, and treasure target
+        | render route, treasure target, and local offline base map
         | use on-device GPS / heading
         v
 Offline kid navigation experience
@@ -82,21 +94,18 @@ Offline kid navigation experience
 
 Rule of thumb:
 
-- smartphone = online host and mission builder
-- Meebook = offline mission player
+- iPhone = online host and mission builder
+- Meebook = offline mission player with a locally installed offline map base
 
 ### Component flow
 
 ```text
-Smartphone host app
--------------------
-Share Intent
-  -> SharedCacheParser
-  -> partial import (GC code / link / maybe title)
-  -> cache resolver
-      -> complete cache data immediately
-      -> or manual completion now
-      -> or online resolution later on smartphone
+iPhone host app
+---------------
+Geocaching share intake
+  -> cache link / code extraction
+  -> online cache resolution
+  -> route / waypoint preparation
   -> MissionDraft
   -> MissionPackage writer
   -> local transfer client
@@ -106,15 +115,49 @@ Meebook kid app
 local transfer receiver
   -> MissionPackage validator
   -> local mission storage
-  -> offline map renderer
+  -> local offline map base
   -> route / waypoint / X overlays
   -> kid-facing navigation UI
   -> GPS / heading providers
 ```
 
+### Offline map direction
+
+The current repository should no longer assume mission-specific OSM fetching on the Android host.
+
+The intended map architecture is:
+
+- the Meebook stores an offline map base for a region or country
+- mission packages carry overlays and mission metadata, not a full generated map
+- the kid UI renders:
+  - local offline map base
+  - fixed player position `O`
+  - treasure target `X`
+  - route / waypoints
+
+Mission-specific generated map assets may still exist as prototype or fallback code, but they are not the long-term architecture.
+
+### Kid map presentation
+
+The child map should stay:
+
+- grayscale and e-ink-friendly
+- text-light to text-free
+- quiet in motion
+- vertically split:
+  - compass on top
+  - map below
+
+The intended map camera style is:
+
+- subtle 3D tilt only
+- e-ink-safe and low-motion
+- no constant cinematic camera movement
+- north fallback when no reliable heading is available
+
 ## BLE integration
 
-The BLE path is host-only and not sensor-specific yet.
+The BLE path is Meebook-side and not sensor-specific yet.
 
 You need to replace the placeholder UUIDs in:
 
@@ -131,7 +174,7 @@ After that, the next step is to add:
 
 Open the project in Android Studio and let it create or sync the Gradle wrapper locally if needed.
 
-The Android host loads:
+The Android app currently loads:
 
 - `file:///android_asset/web/index.html`
 
@@ -143,11 +186,11 @@ Default target coordinate on first launch:
 
 Recommended next implementation steps:
 
-1. Turn `MissionDraft` into a persistable `MissionPackage`.
-2. Add local storage for prepared missions on the host side.
-3. Implement device-to-device transfer from smartphone host to Meebook.
-4. Add real smartphone-side online cache resolution behind the current manual completion step.
-5. Continue separating parent setup UI from the eventual child-only mission view.
+1. Stop treating Android-host map generation as the primary path.
+2. Recut the kid map around a device-local offline map base on the Meebook.
+3. Keep mission packages focused on overlays, route, target, and mission metadata.
+4. Define the real iPhone host responsibilities and transfer contract explicitly.
+5. Continue simplifying the child-only mission view.
 
 ## Engineering workflow
 
