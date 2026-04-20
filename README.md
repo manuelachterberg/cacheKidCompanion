@@ -6,40 +6,53 @@ Kid-friendly geocaching companion with e-ink display: follow the arrow, not an a
 
 ## Current state
 
-This repository now contains a hybrid baseline:
-
-- a web app UI that can also run inside an Android WebView host
-- an Android host app in Kotlin for permissions, sensors, and future BLE integration
+This repository now contains the first working host-side mission intake flow.
 
 Implemented:
 
-- local WebView-served web app from `app/src/main/assets/web/`
+- Android host app in Kotlin with a local WebView UI
 - browser-side navigation math for target bearing, distance, and arrow direction
 - browser geolocation fallback
-- browser device-orientation fallback
 - Android host bridge with:
   - native permission request hook
   - native heading stream from Android rotation sensor
   - native location stream from Android `LocationManager`
   - BLE capability status hook
+- versioned host mission domain:
+  - `MissionDraft`
+  - `MissionTarget`
+  - mission package schema and manifest types
+- smartphone host share intake:
+  - `ACTION_SEND` text payloads
+  - `coord.info/GC...` links
+  - partial vs resolved import states
+- first parent-side resolution flow:
+  - detect shared cache code
+  - manually complete missing title and coordinates
+  - create a `MissionDraft`
 - simple e-ink-friendly black/white UI
 
 ## Architecture
 
-The project is split into two runtime layers:
+The current implementation is an Android host app with a WebView-based UI shell.
 
-- `web app`
-  - main UI
-  - navigation logic
-  - browser geolocation fallback
-  - browser orientation fallback
+The split today is:
+
+- `host domain`
+  - cache import parsing
+  - resolution state
+  - mission draft creation
 - `android host`
-  - WebView container
+  - intent entrypoint
   - permission management
   - native sensor collection
   - future BLE and e-ink specific integrations
+- `web ui shell`
+  - navigation display
+  - parent-side review widgets
+  - browser geolocation fallback
 
-The bridge contract is intentionally capability-driven. The web app can run without the Android layer and enhance itself when `window.AndroidHost` exists.
+The bridge contract is intentionally capability-driven. The UI can fall back to browser features when `window.AndroidHost` is absent, but the smartphone host is the primary runtime for cache intake.
 
 ### Data flow
 
@@ -80,8 +93,10 @@ Smartphone host app
 Share Intent
   -> SharedCacheParser
   -> partial import (GC code / link / maybe title)
-  -> cache resolver (online on smartphone)
-  -> complete cache data
+  -> cache resolver
+      -> complete cache data immediately
+      -> or manual completion now
+      -> or online resolution later on smartphone
   -> MissionDraft
   -> MissionPackage writer
   -> local transfer client
@@ -128,10 +143,11 @@ Default target coordinate on first launch:
 
 Recommended next implementation steps:
 
-1. Add real BLE scan, connect, and characteristic notification handling in the Android host.
-2. Formalize the bridge API with versioned message types.
-3. Add a pure-browser dev mode so the same web app can be served outside Android during development.
-4. Add cache target persistence and kid-safe fullscreen mode.
+1. Turn `MissionDraft` into a persistable `MissionPackage`.
+2. Add local storage for prepared missions on the host side.
+3. Implement device-to-device transfer from smartphone host to Meebook.
+4. Add real smartphone-side online cache resolution behind the current manual completion step.
+5. Continue separating parent setup UI from the eventual child-only mission view.
 
 ## Engineering workflow
 

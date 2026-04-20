@@ -114,7 +114,6 @@ Do not push logic into UI layers where it becomes hard to test.
 Changes merge only through pull requests with:
 
 - green required CI checks
-- required review approval
 - resolved review conversations
 - branch protection respected
 
