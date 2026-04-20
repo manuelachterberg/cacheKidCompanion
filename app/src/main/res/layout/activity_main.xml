@@ -88,6 +88,41 @@
             android:textColor="#5D5D55"
             android:textSize="12sp"
             android:visibility="gone" />
+
+        <EditText
+            android:id="@+id/nativeSendHostInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:hint="Empfangsadresse, z.B. 192.168.0.2"
+            android:inputType="textUri"
+            android:visibility="gone" />
+
+        <EditText
+            android:id="@+id/nativeSendPortInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:hint="8765"
+            android:inputType="number"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/nativeSendMissionButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Mission senden"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/nativeSendMissionStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="#5D5D55"
+            android:textSize="12sp"
+            android:visibility="gone" />
     </LinearLayout>
 
     <LinearLayout

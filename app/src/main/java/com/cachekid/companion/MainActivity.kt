@@ -23,6 +23,8 @@ import com.cachekid.companion.host.importing.SharedTextPayload
 import com.cachekid.companion.host.mission.MissionDraft
 import com.cachekid.companion.host.mission.MissionPackageFileStore
 import com.cachekid.companion.host.mission.MissionPackageReceiverServer
+import com.cachekid.companion.host.mission.MissionPackageSendResult
+import com.cachekid.companion.host.mission.MissionPackageSenderClient
 import com.cachekid.companion.host.mission.MissionPackageStoreResult
 import com.cachekid.companion.host.mission.MissionPackageWriter
 import com.cachekid.companion.host.resolution.CacheResolutionResult
@@ -30,6 +32,9 @@ import com.cachekid.companion.host.resolution.HostCacheResolver
 import com.cachekid.companion.host.resolution.ManualCacheResolutionService
 import com.cachekid.companion.web.NativeBridge
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
 
@@ -42,12 +47,14 @@ class MainActivity : AppCompatActivity() {
     private val missionDraftFactory = MissionDraftFactory()
     private val missionPackageWriter = MissionPackageWriter()
     private val missionPackageFileStore = MissionPackageFileStore()
+    private val missionPackageSenderClient = MissionPackageSenderClient()
 
     private var pendingImportResult: SharedCacheImportResult? = null
     private var pendingResolutionResult: CacheResolutionResult? = null
     private var pendingMissionDraft: MissionDraft? = null
     private var pendingShareDebug: String? = null
     private var storedMissionResult: MissionPackageStoreResult? = null
+    private var sendMissionResult: MissionPackageSendResult? = null
     private var receiveServer: MissionPackageReceiverServer? = null
     private var receiveServerRunning: Boolean = false
     private var receiveStatusText: String = "Empfang aus."
@@ -121,6 +128,21 @@ class MainActivity : AppCompatActivity() {
         }
         binding.nativeReceiveToggleButton.setOnClickListener {
             toggleReceiveMode()
+        }
+        binding.nativeSendMissionButton.setOnClickListener {
+            lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    sendPendingMissionDraft(
+                        host = binding.nativeSendHostInput.text?.toString().orEmpty(),
+                        portText = binding.nativeSendPortInput.text?.toString().orEmpty(),
+                    )
+                }
+                Toast.makeText(
+                    this@MainActivity,
+                    result?.message ?: "Mission konnte nicht gesendet werden.",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
         }
 
         handleShareIntent(intent)
@@ -235,6 +257,7 @@ class MainActivity : AppCompatActivity() {
         pendingResolutionResult = pendingImportResult?.value?.let { hostCacheResolver.resolve(it) }
         pendingMissionDraft = pendingResolutionResult?.value?.let { missionDraftFactory.createFrom(it) }
         storedMissionResult = null
+        sendMissionResult = null
         refreshNativeImportPanel()
         if (::nativeBridge.isInitialized) {
             nativeBridge.notifyImportUpdated()
@@ -274,6 +297,12 @@ class MainActivity : AppCompatActivity() {
         binding.nativeStoredMissionStatus.text = storedMissionResult?.missionDirectory?.let { missionDirectory ->
             "Gespeichert in: ${missionDirectory.name}"
         }.orEmpty()
+        binding.nativeSendHostInput.visibility = if (hasDraftReadyMission) View.VISIBLE else View.GONE
+        binding.nativeSendPortInput.visibility = if (hasDraftReadyMission) View.VISIBLE else View.GONE
+        binding.nativeSendMissionButton.visibility = if (hasDraftReadyMission) View.VISIBLE else View.GONE
+        binding.nativeSendMissionStatus.visibility =
+            if (hasDraftReadyMission && sendMissionResult != null) View.VISIBLE else View.GONE
+        binding.nativeSendMissionStatus.text = sendMissionResult?.message.orEmpty()
 
         if (needsManualResolution && binding.nativeResolutionTitleInput.text.isNullOrBlank()) {
             binding.nativeResolutionTitleInput.setText(pendingResolutionResult?.cacheCodeHint.orEmpty())
@@ -287,7 +316,15 @@ class MainActivity : AppCompatActivity() {
         }
         if (!hasDraftReadyMission) {
             storedMissionResult = null
+            sendMissionResult = null
             binding.nativeStoredMissionStatus.text = ""
+            binding.nativeSendMissionStatus.text = ""
+        }
+        if (hasDraftReadyMission && binding.nativeSendPortInput.text.isNullOrBlank()) {
+            binding.nativeSendPortInput.setText(DEFAULT_RECEIVER_PORT.toString())
+        }
+        if (hasDraftReadyMission && binding.nativeSendHostInput.text.isNullOrBlank()) {
+            binding.nativeSendHostInput.setText(DEFAULT_RECEIVER_HOST)
         }
     }
 
@@ -385,6 +422,7 @@ class MainActivity : AppCompatActivity() {
         )
         pendingMissionDraft = missionDraftFactory.createFrom(resolvedCache)
         storedMissionResult = null
+        sendMissionResult = null
         refreshNativeImportPanel()
         if (::nativeBridge.isInitialized) {
             nativeBridge.notifyImportUpdated()
@@ -410,6 +448,30 @@ class MainActivity : AppCompatActivity() {
         )
         refreshNativeImportPanel()
         return storedMissionResult
+    }
+
+    private fun sendPendingMissionDraft(host: String, portText: String): MissionPackageSendResult? {
+        val draft = pendingMissionDraft ?: return null
+        val writeResult = missionPackageWriter.write(draft)
+        if (!writeResult.isSuccess) {
+            sendMissionResult = MissionPackageSendResult(
+                isSuccess = false,
+                statusCode = null,
+                message = writeResult.errors.joinToString(" "),
+            )
+            refreshNativeImportPanel()
+            return sendMissionResult
+        }
+
+        val missionPackage = writeResult.missionPackage ?: return null
+        val port = portText.trim().toIntOrNull()
+        sendMissionResult = missionPackageSenderClient.send(
+            host = host,
+            port = port ?: -1,
+            missionPackage = missionPackage,
+        )
+        refreshNativeImportPanel()
+        return sendMissionResult
     }
 
     private fun toggleReceiveMode() {
@@ -441,5 +503,7 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val DEFAULT_TARGET_TEXT = "52.520008,13.404954"
         const val MISSION_STORAGE_DIRECTORY = "missions"
+        const val DEFAULT_RECEIVER_HOST = "127.0.0.1"
+        const val DEFAULT_RECEIVER_PORT = 8765
     }
 }
