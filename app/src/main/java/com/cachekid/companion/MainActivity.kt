@@ -27,6 +27,8 @@ import com.cachekid.companion.host.mission.MissionPackageSendResult
 import com.cachekid.companion.host.mission.MissionPackageSenderClient
 import com.cachekid.companion.host.mission.MissionPackageStoreResult
 import com.cachekid.companion.host.mission.MissionPackageWriter
+import com.cachekid.companion.host.mission.MissionTargetParser
+import com.cachekid.companion.host.mission.HostMissionBuilderPresenter
 import com.cachekid.companion.host.resolution.CacheResolutionResult
 import com.cachekid.companion.host.resolution.HostCacheResolver
 import com.cachekid.companion.host.resolution.ManualCacheResolutionService
@@ -48,6 +50,8 @@ class MainActivity : AppCompatActivity() {
     private val missionPackageWriter = MissionPackageWriter()
     private val missionPackageFileStore = MissionPackageFileStore()
     private val missionPackageSenderClient = MissionPackageSenderClient()
+    private val missionTargetParser = MissionTargetParser()
+    private val hostMissionBuilderPresenter = HostMissionBuilderPresenter(missionTargetParser)
 
     private var pendingImportResult: SharedCacheImportResult? = null
     private var pendingResolutionResult: CacheResolutionResult? = null
@@ -110,6 +114,26 @@ class MainActivity : AppCompatActivity() {
                 ).show()
             }
         }
+        binding.nativeUpdateMissionButton.setOnClickListener {
+            val draft = updatePendingMissionDraft(
+                childTitle = binding.nativeMissionChildTitleInput.text?.toString().orEmpty(),
+                summary = binding.nativeMissionSummaryInput.text?.toString().orEmpty(),
+                targetText = binding.nativeMissionTargetInput.text?.toString().orEmpty(),
+            )
+            if (draft == null) {
+                Toast.makeText(
+                    this,
+                    "Bitte Kindertitel, Kurztext und Ziel pruefen.",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } else {
+                Toast.makeText(
+                    this,
+                    "Missionsdaten aktualisiert.",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
         binding.nativeSaveMissionButton.setOnClickListener {
             val result = storePendingMissionDraft()
             if (result?.isSuccess == true) {
@@ -137,6 +161,7 @@ class MainActivity : AppCompatActivity() {
                         portText = binding.nativeSendPortInput.text?.toString().orEmpty(),
                     )
                 }
+                refreshNativeImportPanel()
                 Toast.makeText(
                     this@MainActivity,
                     result?.message ?: "Mission konnte nicht gesendet werden.",
@@ -265,65 +290,79 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshNativeImportPanel() {
-        val summary = pendingImportSummary()
-        val debug = pendingShareDebug
-        if (summary == null && debug == null) {
+        val panelState = hostMissionBuilderPresenter.present(
+            importSummary = pendingImportSummary(),
+            shareDebug = pendingShareDebug,
+            resolutionResult = pendingResolutionResult,
+            missionDraft = pendingMissionDraft,
+            storedMissionResult = storedMissionResult,
+            sendMissionResult = sendMissionResult,
+            defaultTargetText = DEFAULT_TARGET_TEXT,
+        )
+        if (!panelState.isVisible) {
             binding.nativeImportPanel.visibility = View.GONE
             return
         }
 
         binding.nativeImportPanel.visibility = View.VISIBLE
-        binding.nativeImportTitle.text = when {
-            pendingMissionDraft != null -> "Mission bereit"
-            pendingResolutionResult?.status == com.cachekid.companion.host.resolution.CacheResolutionStatus.NEEDS_ONLINE_RESOLUTION ->
-                "Cache erkannt"
-            else -> "Import"
-        }
-        binding.nativeImportStatus.text = summary ?: "Share-Intent empfangen."
+        binding.nativeImportTitle.text = panelState.panelTitle
+        binding.nativeImportStatus.text = panelState.panelStatus
 
-        val needsManualResolution =
-            pendingMissionDraft == null &&
-                pendingResolutionResult?.status == com.cachekid.companion.host.resolution.CacheResolutionStatus.NEEDS_ONLINE_RESOLUTION
-        val hasDraftReadyMission = pendingMissionDraft != null
+        binding.nativeImportDebug.visibility = if (panelState.debugText != null) View.VISIBLE else View.GONE
+        binding.nativeImportDebug.text = panelState.debugText.orEmpty()
 
-        binding.nativeImportDebug.visibility = if (needsManualResolution) View.VISIBLE else View.GONE
-        binding.nativeImportDebug.text = if (needsManualResolution) debug.orEmpty() else ""
-        binding.nativeResolutionTitleInput.visibility = if (needsManualResolution) View.VISIBLE else View.GONE
-        binding.nativeResolutionTargetInput.visibility = if (needsManualResolution) View.VISIBLE else View.GONE
-        binding.nativeResolveButton.visibility = if (needsManualResolution) View.VISIBLE else View.GONE
-        binding.nativeSaveMissionButton.visibility = if (hasDraftReadyMission) View.VISIBLE else View.GONE
-        binding.nativeStoredMissionStatus.visibility =
-            if (hasDraftReadyMission && storedMissionResult?.isSuccess == true) View.VISIBLE else View.GONE
-        binding.nativeStoredMissionStatus.text = storedMissionResult?.missionDirectory?.let { missionDirectory ->
-            "Gespeichert in: ${missionDirectory.name}"
-        }.orEmpty()
-        binding.nativeSendHostInput.visibility = if (hasDraftReadyMission) View.VISIBLE else View.GONE
-        binding.nativeSendPortInput.visibility = if (hasDraftReadyMission) View.VISIBLE else View.GONE
-        binding.nativeSendMissionButton.visibility = if (hasDraftReadyMission) View.VISIBLE else View.GONE
-        binding.nativeSendMissionStatus.visibility =
-            if (hasDraftReadyMission && sendMissionResult != null) View.VISIBLE else View.GONE
-        binding.nativeSendMissionStatus.text = sendMissionResult?.message.orEmpty()
+        binding.nativeResolutionTitleInput.visibility =
+            if (panelState.showManualResolution) View.VISIBLE else View.GONE
+        binding.nativeResolutionTargetInput.visibility =
+            if (panelState.showManualResolution) View.VISIBLE else View.GONE
+        binding.nativeResolveButton.visibility =
+            if (panelState.showManualResolution) View.VISIBLE else View.GONE
 
-        if (needsManualResolution && binding.nativeResolutionTitleInput.text.isNullOrBlank()) {
-            binding.nativeResolutionTitleInput.setText(pendingResolutionResult?.cacheCodeHint.orEmpty())
+        if (panelState.showManualResolution && binding.nativeResolutionTitleInput.text.isNullOrBlank()) {
+            binding.nativeResolutionTitleInput.setText(panelState.manualResolutionTitle)
         }
-        if (needsManualResolution && binding.nativeResolutionTargetInput.text.isNullOrBlank()) {
-            binding.nativeResolutionTargetInput.setText(DEFAULT_TARGET_TEXT)
+        if (panelState.showManualResolution && binding.nativeResolutionTargetInput.text.isNullOrBlank()) {
+            binding.nativeResolutionTargetInput.setText(panelState.manualResolutionTarget)
         }
-        if (!needsManualResolution) {
+        if (!panelState.showManualResolution) {
             binding.nativeResolutionTitleInput.text?.clear()
             binding.nativeResolutionTargetInput.text?.clear()
         }
-        if (!hasDraftReadyMission) {
+
+        binding.nativeMissionReviewSection.visibility =
+            if (panelState.showMissionBuilder) View.VISIBLE else View.GONE
+        binding.nativeUpdateMissionButton.visibility =
+            if (panelState.showMissionBuilder) View.VISIBLE else View.GONE
+        binding.nativeMissionBuilderHint.visibility =
+            if (panelState.showMissionBuilder && panelState.builderHint != null) View.VISIBLE else View.GONE
+        binding.nativeMissionBuilderHint.text = panelState.builderHint.orEmpty()
+        binding.nativeMissionCacheCode.text = panelState.missionCacheCode
+        binding.nativeMissionSourceTitle.text = panelState.missionSourceTitle
+        binding.nativeMissionChildTitleInput.setText(panelState.missionChildTitle)
+        binding.nativeMissionSummaryInput.setText(panelState.missionSummary)
+        binding.nativeMissionTargetInput.setText(panelState.missionTargetText)
+
+        binding.nativeSaveMissionButton.visibility = if (panelState.showMissionBuilder) View.VISIBLE else View.GONE
+        binding.nativeStoredMissionStatus.visibility =
+            if (panelState.showStoredStatus) View.VISIBLE else View.GONE
+        binding.nativeStoredMissionStatus.text = panelState.storedStatus.orEmpty()
+        binding.nativeSendHostInput.visibility = if (panelState.showMissionBuilder) View.VISIBLE else View.GONE
+        binding.nativeSendPortInput.visibility = if (panelState.showMissionBuilder) View.VISIBLE else View.GONE
+        binding.nativeSendMissionButton.visibility = if (panelState.showMissionBuilder) View.VISIBLE else View.GONE
+        binding.nativeSendMissionStatus.visibility =
+            if (panelState.showSendStatus) View.VISIBLE else View.GONE
+        binding.nativeSendMissionStatus.text = panelState.sendStatus.orEmpty()
+
+        if (!panelState.showMissionBuilder) {
             storedMissionResult = null
             sendMissionResult = null
             binding.nativeStoredMissionStatus.text = ""
             binding.nativeSendMissionStatus.text = ""
         }
-        if (hasDraftReadyMission && binding.nativeSendPortInput.text.isNullOrBlank()) {
+        if (panelState.showMissionBuilder && binding.nativeSendPortInput.text.isNullOrBlank()) {
             binding.nativeSendPortInput.setText(DEFAULT_RECEIVER_PORT.toString())
         }
-        if (hasDraftReadyMission && binding.nativeSendHostInput.text.isNullOrBlank()) {
+        if (panelState.showMissionBuilder && binding.nativeSendHostInput.text.isNullOrBlank()) {
             binding.nativeSendHostInput.setText(DEFAULT_RECEIVER_HOST)
         }
     }
@@ -389,11 +428,17 @@ class MainActivity : AppCompatActivity() {
         return "${result.status.name.lowercase()}: $draftState: $messageText"
     }
 
-    private fun updatePendingMissionDraft(childTitle: String, summary: String): MissionDraft? {
+    private fun updatePendingMissionDraft(
+        childTitle: String,
+        summary: String,
+        targetText: String,
+    ): MissionDraft? {
         val currentDraft = pendingMissionDraft ?: return null
+        val target = missionTargetParser.parse(targetText) ?: return null
         pendingMissionDraft = currentDraft.copy(
             childTitle = childTitle.trim().ifBlank { currentDraft.childTitle },
             summary = summary.trim().ifBlank { currentDraft.summary },
+            target = target,
         )
         refreshNativeImportPanel()
         if (::nativeBridge.isInitialized) {
@@ -459,7 +504,6 @@ class MainActivity : AppCompatActivity() {
                 statusCode = null,
                 message = writeResult.errors.joinToString(" "),
             )
-            refreshNativeImportPanel()
             return sendMissionResult
         }
 
@@ -470,7 +514,6 @@ class MainActivity : AppCompatActivity() {
             port = port ?: -1,
             missionPackage = missionPackage,
         )
-        refreshNativeImportPanel()
         return sendMissionResult
     }
 
