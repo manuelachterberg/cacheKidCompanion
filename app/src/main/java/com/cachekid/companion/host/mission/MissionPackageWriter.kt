@@ -111,7 +111,7 @@ $filesJson
     }
 
     private fun buildOfflineMapFiles(offlineMap: MissionOfflineMap?): List<MissionPackageFile> {
-        if (offlineMap == null) {
+        if (offlineMap == null || offlineMap.svgContent.isBlank()) {
             return emptyList()
         }
 

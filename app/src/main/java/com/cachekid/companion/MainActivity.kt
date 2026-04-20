@@ -31,6 +31,7 @@ import com.cachekid.companion.host.mission.MissionPackageStoreResult
 import com.cachekid.companion.host.mission.MissionPackageWriter
 import com.cachekid.companion.host.mission.MissionTargetParser
 import com.cachekid.companion.host.mission.HostMissionBuilderPresenter
+import com.cachekid.companion.host.mission.MissionOfflineMapService
 import com.cachekid.companion.host.mission.OfflineMissionMapComposer
 import com.cachekid.companion.host.resolution.CacheResolutionResult
 import com.cachekid.companion.host.resolution.HostCacheResolver
@@ -56,6 +57,7 @@ class MainActivity : AppCompatActivity() {
     private val missionTargetParser = MissionTargetParser()
     private val hostMissionBuilderPresenter = HostMissionBuilderPresenter(missionTargetParser)
     private val offlineMissionMapComposer = OfflineMissionMapComposer()
+    private val missionOfflineMapService = MissionOfflineMapService()
     private val activeMissionRepository = ActiveMissionRepository()
 
     private var pendingImportResult: SharedCacheImportResult? = null
@@ -142,17 +144,18 @@ class MainActivity : AppCompatActivity() {
             }
         }
         binding.nativeSaveMissionButton.setOnClickListener {
-            val result = storePendingMissionDraft()
-            if (result?.isSuccess == true) {
+            lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    storePendingMissionDraft()
+                }
+                refreshNativeImportPanel()
                 Toast.makeText(
-                    this,
-                    "Mission lokal gespeichert.",
-                    Toast.LENGTH_SHORT,
-                ).show()
-            } else {
-                Toast.makeText(
-                    this,
-                    result?.errors?.firstOrNull() ?: "Mission konnte nicht gespeichert werden.",
+                    this@MainActivity,
+                    if (result?.isSuccess == true) {
+                        "Mission lokal gespeichert."
+                    } else {
+                        result?.errors?.firstOrNull() ?: "Mission konnte nicht gespeichert werden."
+                    },
                     Toast.LENGTH_SHORT,
                 ).show()
             }
@@ -512,7 +515,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun storePendingMissionDraft(): MissionPackageStoreResult? {
         val draft = pendingMissionDraft ?: return null
-        val writeResult = missionPackageWriter.write(draft)
+        val preparedDraft = missionOfflineMapService.prepareDraft(draft)
+        val writeResult = missionPackageWriter.write(preparedDraft)
         if (!writeResult.isSuccess) {
             return MissionPackageStoreResult(
                 missionDirectory = null,
@@ -542,13 +546,13 @@ class MainActivity : AppCompatActivity() {
                 nativeBridge.notifyImportUpdated()
             }
         }
-        refreshNativeImportPanel()
         return result
     }
 
     private fun sendPendingMissionDraft(host: String, portText: String): MissionPackageSendResult? {
         val draft = pendingMissionDraft ?: return null
-        val writeResult = missionPackageWriter.write(draft)
+        val preparedDraft = missionOfflineMapService.prepareDraft(draft)
+        val writeResult = missionPackageWriter.write(preparedDraft)
         if (!writeResult.isSuccess) {
             sendMissionResult = MissionPackageSendResult(
                 isSuccess = false,
