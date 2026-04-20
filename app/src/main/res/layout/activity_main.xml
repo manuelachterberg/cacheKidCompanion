@@ -90,4 +90,41 @@
             android:visibility="gone" />
     </LinearLayout>
 
+    <LinearLayout
+        android:id="@+id/nativeReceivePanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_margin="12dp"
+        android:background="#FFFDF8"
+        android:elevation="8dp"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/nativeReceiveTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Empfangsmodus"
+            android:textColor="#151515"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/nativeReceiveStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Empfang aus."
+            android:textColor="#5D5D55"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/nativeReceiveToggleButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Empfang starten" />
+    </LinearLayout>
+
 </FrameLayout>
