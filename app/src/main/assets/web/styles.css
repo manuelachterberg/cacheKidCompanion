@@ -126,13 +126,62 @@ strong {
   padding: 18px;
 }
 
+.import-review {
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.import-status-banner {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #f7f2de;
+}
+
+.import-status-banner strong {
+  display: block;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.resolution-panel {
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.import-review h2 {
+  margin: 0 0 14px;
+  font-size: 1.35rem;
+}
+
+.resolution-panel h2 {
+  margin: 0 0 10px;
+  font-size: 1.35rem;
+}
+
+.status--tight {
+  margin-top: 0;
+  margin-bottom: 14px;
+}
+
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
 label {
   display: block;
   font-size: 0.92rem;
   margin-bottom: 8px;
 }
 
-input {
+input,
+textarea {
   width: 100%;
   border: 2px solid var(--line);
   border-radius: 16px;
@@ -142,11 +191,21 @@ input {
   color: var(--ink);
 }
 
+textarea {
+  resize: vertical;
+  min-height: 92px;
+  margin-bottom: 12px;
+}
+
 .button-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin-top: 12px;
+}
+
+.button-row--dual {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 button {
@@ -181,7 +240,8 @@ button.secondary {
 
   .stats-grid,
   .detail-grid,
-  .button-row {
+  .button-row,
+  .review-grid {
     grid-template-columns: 1fr;
   }
 

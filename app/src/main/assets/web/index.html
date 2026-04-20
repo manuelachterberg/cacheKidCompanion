@@ -41,6 +41,59 @@
     </section>
 
     <section class="control-panel">
+      <div id="importStatusBanner" class="import-status-banner" hidden>
+        <p class="eyebrow">Import</p>
+        <strong id="importStatusText">--</strong>
+        <p id="shareDebugText" class="status status--tight" hidden>--</p>
+      </div>
+
+      <div id="resolutionPanel" class="resolution-panel" hidden>
+        <p class="eyebrow">Host-Status</p>
+        <h2>Cache erkannt</h2>
+        <p id="resolutionMessage" class="status status--tight">--</p>
+        <div class="review-grid">
+          <article class="detail-card">
+            <span class="label">Cache-Code</span>
+            <strong id="resolutionCacheCode">--</strong>
+          </article>
+          <article class="detail-card">
+            <span class="label">Naechster Schritt</span>
+            <strong>Online aufloesen</strong>
+          </article>
+        </div>
+        <label for="resolutionTitleInput">Cache-Titel</label>
+        <input id="resolutionTitleInput" type="text" spellcheck="false" placeholder="z.B. Der alte Baum" />
+        <label for="resolutionTargetInput">Zielkoordinate</label>
+        <input id="resolutionTargetInput" type="text" spellcheck="false" placeholder="52.520008,13.404954" />
+        <div class="button-row button-row--dual">
+          <button id="resolveManuallyButton">Mission manuell anlegen</button>
+          <button id="prefillImportedTargetButton" class="secondary">Koordinate ins Ziel uebernehmen</button>
+        </div>
+      </div>
+
+      <div id="importReviewPanel" class="import-review" hidden>
+        <p class="eyebrow">Elternansicht</p>
+        <h2>Importierter Cache</h2>
+        <div class="review-grid">
+          <article class="detail-card">
+            <span class="label">Cache-Code</span>
+            <strong id="importCacheCode">--</strong>
+          </article>
+          <article class="detail-card">
+            <span class="label">Originaltitel</span>
+            <strong id="importSourceTitle">--</strong>
+          </article>
+        </div>
+        <label for="childTitleInput">Titel fuer das Kind</label>
+        <input id="childTitleInput" type="text" spellcheck="false" />
+        <label for="summaryInput">Kurze Missionsbeschreibung</label>
+        <textarea id="summaryInput" rows="3"></textarea>
+        <div class="button-row button-row--dual">
+          <button id="saveDraftButton">Missionstext speichern</button>
+          <button id="useImportedTargetButton" class="secondary">Ziel aus Import nutzen</button>
+        </div>
+      </div>
+
       <label for="targetInput">Zielkoordinate</label>
       <input id="targetInput" type="text" value="52.520008,13.404954" spellcheck="false" />
       <div class="button-row">

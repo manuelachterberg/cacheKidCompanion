@@ -114,11 +114,27 @@ Do not push logic into UI layers where it becomes hard to test.
 Changes merge only through pull requests with:
 
 - green required CI checks
-- required review approval
 - resolved review conversations
 - branch protection respected
 
 Do not bypass branch protection to "move faster".
+
+## 8a. Branch cleanup rule
+
+Merged working branches should normally be deleted.
+
+That applies to:
+
+- remote feature or chore branches after the pull request is merged
+- local branches once the merged work is no longer needed for active development
+
+Why:
+
+- it keeps the branch list readable
+- it reduces the chance of continuing work on stale history
+- it makes the current delivery path obvious
+
+Exceptions should be rare and explicit. Long-lived branches should exist only when there is a clear ongoing purpose.
 
 ## 9. Issue slicing rule
 
@@ -178,3 +194,31 @@ Before starting implementation, capture these five things:
 - main risk
 
 This should be lightweight, but it should exist.
+
+## 13. Kid UI separation rule
+
+Kid-facing screens must stay intentionally minimal.
+
+The product should clearly separate:
+
+- child-facing navigation views
+- parent-facing setup views
+- debug or technical views
+
+Child-facing navigation should avoid exposing technical detail unless it is essential for the child to complete the task.
+
+As a default rule, the child view should favor:
+
+- the treasure map
+- the route or next waypoint
+- the large target marker
+- at most a very small number of clear actions
+
+It should avoid exposing development-oriented values such as:
+
+- raw heading values
+- sensor source labels
+- technical permission state
+- setup-oriented controls
+
+If a screen needs technical controls, it should default to a parent or debug mode instead of becoming part of the standard child flow.
