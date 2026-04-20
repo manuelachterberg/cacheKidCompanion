@@ -91,6 +91,11 @@ import {
   }
 
   function renderImportStatus() {
+    if (state.hasNativeHost) {
+      ui.importStatusBanner.hidden = true;
+      return;
+    }
+
     if (!state.importStatus && !state.shareDebug) {
       ui.importStatusBanner.hidden = true;
       return;
@@ -107,6 +112,11 @@ import {
   }
 
   function renderPendingResolution() {
+    if (state.hasNativeHost) {
+      ui.resolutionPanel.hidden = true;
+      return;
+    }
+
     if (!state.pendingResolution || state.pendingMissionDraft) {
       ui.resolutionPanel.hidden = true;
       return;
@@ -126,6 +136,11 @@ import {
   }
 
   function renderPendingMissionDraft() {
+    if (state.hasNativeHost) {
+      ui.importReviewPanel.hidden = true;
+      return;
+    }
+
     if (!state.pendingMissionDraft) {
       ui.importReviewPanel.hidden = true;
       return;
@@ -327,6 +342,7 @@ import {
     const rawDraft = window.AndroidHost.updatePendingMissionDraft(
       ui.childTitleInput.value,
       ui.summaryInput.value,
+      ui.targetInput.value,
     );
 
     if (rawDraft) {

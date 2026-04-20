@@ -72,6 +72,100 @@
             android:text="Mission manuell anlegen"
             android:visibility="gone" />
 
+        <LinearLayout
+            android:id="@+id/nativeMissionReviewSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Mission pruefen"
+                android:textColor="#151515"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Cache-Code"
+                android:textColor="#5D5D55"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/nativeMissionCacheCode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="#151515"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Originaltitel"
+                android:textColor="#5D5D55"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/nativeMissionSourceTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="#151515"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/nativeMissionChildTitleInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:hint="Titel fuer das Kind"
+                android:inputType="textCapSentences" />
+
+            <EditText
+                android:id="@+id/nativeMissionSummaryInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="top|start"
+                android:hint="Kurze Missionsbeschreibung"
+                android:inputType="textMultiLine|textCapSentences"
+                android:minLines="3" />
+
+            <EditText
+                android:id="@+id/nativeMissionTargetInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:hint="Zielkoordinate"
+                android:inputType="text" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/nativeUpdateMissionButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Missionsdaten uebernehmen"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/nativeMissionBuilderHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="#5D5D55"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
         <Button
             android:id="@+id/nativeSaveMissionButton"
             android:layout_width="match_parent"

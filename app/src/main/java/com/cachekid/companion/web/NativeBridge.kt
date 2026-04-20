@@ -24,7 +24,7 @@ class NativeBridge(
     private val getPendingShareDebugAction: () -> String?,
     private val getPendingMissionDraft: () -> MissionDraft?,
     private val getPendingResolution: () -> CacheResolutionResult?,
-    private val updatePendingMissionDraftAction: (String, String) -> MissionDraft?,
+    private val updatePendingMissionDraftAction: (String, String, String) -> MissionDraft?,
     private val resolvePendingCacheManuallyAction: (String, String) -> MissionDraft?,
 ) {
 
@@ -86,8 +86,8 @@ class NativeBridge(
     }
 
     @JavascriptInterface
-    fun updatePendingMissionDraft(childTitle: String, summary: String): String? {
-        val draft = updatePendingMissionDraftAction(childTitle, summary) ?: return null
+    fun updatePendingMissionDraft(childTitle: String, summary: String, targetText: String): String? {
+        val draft = updatePendingMissionDraftAction(childTitle, summary, targetText) ?: return null
         return draft.toJson()
     }
 
