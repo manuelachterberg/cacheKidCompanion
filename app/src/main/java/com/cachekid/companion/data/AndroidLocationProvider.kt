@@ -30,10 +30,12 @@ class AndroidLocationProvider(context: Context) {
             override fun onProviderDisabled(provider: String) = Unit
         }
 
-        val lastKnownLocation = listOf(
-            LocationManager.GPS_PROVIDER,
-            LocationManager.NETWORK_PROVIDER,
-        ).firstNotNullOfOrNull { provider -> locationManager.getLastKnownLocation(provider) }
+        val lastKnownLocation = runCatching {
+            listOf(
+                LocationManager.GPS_PROVIDER,
+                LocationManager.NETWORK_PROVIDER,
+            ).firstNotNullOfOrNull { provider -> locationManager.getLastKnownLocation(provider) }
+        }.getOrNull()
         trySend(lastKnownLocation)
 
         listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).forEach { provider ->

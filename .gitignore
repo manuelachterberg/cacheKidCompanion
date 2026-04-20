@@ -1,0 +1,12 @@
+.gradle/
+.idea/
+build/
+app/build/
+local.properties
+
+# Android Studio generated wrapper and caches
+captures/
+
+# OS files
+.DS_Store
+

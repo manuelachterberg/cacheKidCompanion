@@ -1,5 +1,7 @@
 # CacheKidCompanion
 
+![CacheKid Companion](assets/branding/cacheKidLogo.png)
+
 Kid-friendly geocaching companion with e-ink display: follow the arrow, not an app.
 
 ## Current state
@@ -38,6 +40,62 @@ The project is split into two runtime layers:
   - future BLE and e-ink specific integrations
 
 The bridge contract is intentionally capability-driven. The web app can run without the Android layer and enhance itself when `window.AndroidHost` exists.
+
+### Data flow
+
+```text
+Geocaching App on Smartphone
+        |
+        | share link, usually coord.info/GC...
+        v
+CacheKid Host App on Smartphone
+        |
+        | extract GC code
+        | resolve cache online
+        | build MissionDraft / MissionPackage
+        v
+Local transfer to Meebook
+        |
+        | hotspot / local Wi-Fi / later transfer channel
+        v
+CacheKid Kid App on Meebook
+        |
+        | store mission locally
+        | render map, route, and treasure target
+        | use on-device GPS / heading
+        v
+Offline kid navigation experience
+```
+
+Rule of thumb:
+
+- smartphone = online host and mission builder
+- Meebook = offline mission player
+
+### Component flow
+
+```text
+Smartphone host app
+-------------------
+Share Intent
+  -> SharedCacheParser
+  -> partial import (GC code / link / maybe title)
+  -> cache resolver (online on smartphone)
+  -> complete cache data
+  -> MissionDraft
+  -> MissionPackage writer
+  -> local transfer client
+
+Meebook kid app
+---------------
+local transfer receiver
+  -> MissionPackage validator
+  -> local mission storage
+  -> offline map renderer
+  -> route / waypoint / X overlays
+  -> kid-facing navigation UI
+  -> GPS / heading providers
+```
 
 ## BLE integration
 

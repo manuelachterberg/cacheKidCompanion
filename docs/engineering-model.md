@@ -195,3 +195,31 @@ Before starting implementation, capture these five things:
 - main risk
 
 This should be lightweight, but it should exist.
+
+## 13. Kid UI separation rule
+
+Kid-facing screens must stay intentionally minimal.
+
+The product should clearly separate:
+
+- child-facing navigation views
+- parent-facing setup views
+- debug or technical views
+
+Child-facing navigation should avoid exposing technical detail unless it is essential for the child to complete the task.
+
+As a default rule, the child view should favor:
+
+- the treasure map
+- the route or next waypoint
+- the large target marker
+- at most a very small number of clear actions
+
+It should avoid exposing development-oriented values such as:
+
+- raw heading values
+- sensor source labels
+- technical permission state
+- setup-oriented controls
+
+If a screen needs technical controls, it should default to a parent or debug mode instead of becoming part of the standard child flow.

@@ -9,4 +9,68 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <LinearLayout
+        android:id="@+id/nativeImportPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:layout_margin="12dp"
+        android:background="#F7F2DE"
+        android:elevation="8dp"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/nativeImportTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Import"
+            android:textColor="#151515"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/nativeImportStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="#151515"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/nativeImportDebug"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="#5D5D55"
+            android:textSize="12sp" />
+
+        <EditText
+            android:id="@+id/nativeResolutionTitleInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:hint="Cache-Titel"
+            android:inputType="textCapSentences"
+            android:visibility="gone" />
+
+        <EditText
+            android:id="@+id/nativeResolutionTargetInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:hint="Zielkoordinate eingeben"
+            android:inputType="text"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/nativeResolveButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Mission manuell anlegen"
+            android:visibility="gone" />
+    </LinearLayout>
+
 </FrameLayout>

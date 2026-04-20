@@ -5,7 +5,9 @@ import android.location.Location
 import android.os.Build
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import com.cachekid.companion.host.mission.MissionDraft
 import com.cachekid.companion.data.HybridSensorRepository
+import com.cachekid.companion.host.resolution.CacheResolutionResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
@@ -17,6 +19,13 @@ class NativeBridge(
     private val sensorRepository: HybridSensorRepository,
     private val coroutineScope: CoroutineScope,
     private val requestPermissions: () -> Unit,
+    private val hasLocationPermissions: () -> Boolean,
+    private val getPendingImportSummary: () -> String?,
+    private val getPendingShareDebugAction: () -> String?,
+    private val getPendingMissionDraft: () -> MissionDraft?,
+    private val getPendingResolution: () -> CacheResolutionResult?,
+    private val updatePendingMissionDraftAction: (String, String) -> MissionDraft?,
+    private val resolvePendingCacheManuallyAction: (String, String) -> MissionDraft?,
 ) {
 
     private var headingJob: Job? = null
@@ -55,7 +64,51 @@ class NativeBridge(
     }
 
     @JavascriptInterface
+    fun getPendingImportStatus(): String? = getPendingImportSummary()
+
+    @JavascriptInterface
+    fun getPendingShareDebug(): String? = getPendingShareDebugAction()
+
+    @JavascriptInterface
+    fun getPendingMissionDraftJson(): String? {
+        val draft = getPendingMissionDraft() ?: return null
+        return draft.toJson()
+    }
+
+    @JavascriptInterface
+    fun getPendingResolutionJson(): String? {
+        val resolution = getPendingResolution() ?: return null
+        return JSONObject().apply {
+            put("status", resolution.status.name)
+            put("cacheCodeHint", resolution.cacheCodeHint)
+            put("messages", resolution.messages.joinToString(" "))
+        }.toString()
+    }
+
+    @JavascriptInterface
+    fun updatePendingMissionDraft(childTitle: String, summary: String): String? {
+        val draft = updatePendingMissionDraftAction(childTitle, summary) ?: return null
+        return draft.toJson()
+    }
+
+    @JavascriptInterface
+    fun resolvePendingCacheManually(title: String, coordinateText: String): String? {
+        val draft = resolvePendingCacheManuallyAction(title, coordinateText) ?: return null
+        return draft.toJson()
+    }
+
+    @JavascriptInterface
     fun startNativeSensors() {
+        if (!hasLocationPermissions()) {
+            emitEvent(
+                type = "native-status",
+                payload = JSONObject().apply {
+                    put("status", "Standortberechtigung fehlt. Bitte zuerst freigeben.")
+                },
+            )
+            return
+        }
+
         if (headingJob == null) {
             headingJob = coroutineScope.launch {
                 sensorRepository.headingDegrees.collectLatest { heading ->
@@ -86,6 +139,27 @@ class NativeBridge(
         locationJob = null
     }
 
+    fun notifyImportUpdated() {
+        emitEvent(
+            type = "import-updated",
+            payload = JSONObject().apply {
+                put("status", getPendingImportSummary())
+                put("shareDebug", getPendingShareDebugAction())
+                put("missionDraft", getPendingMissionDraft()?.let { JSONObject(it.toJson()) })
+                put(
+                    "resolution",
+                    getPendingResolution()?.let { resolution ->
+                        JSONObject().apply {
+                            put("status", resolution.status.name)
+                            put("cacheCodeHint", resolution.cacheCodeHint)
+                            put("messages", resolution.messages.joinToString(" "))
+                        }
+                    },
+                )
+            },
+        )
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     private fun emitLocationEvent(location: Location) {
         emitEvent(
@@ -111,5 +185,22 @@ class NativeBridge(
                 null,
             )
         }
+    }
+
+    private fun MissionDraft.toJson(): String {
+        return JSONObject().apply {
+            put("cacheCode", cacheCode)
+            put("sourceTitle", sourceTitle)
+            put("childTitle", childTitle)
+            put("summary", summary)
+            put(
+                "target",
+                JSONObject().apply {
+                    put("latitude", target.latitude)
+                    put("longitude", target.longitude)
+                },
+            )
+            put("sourceApp", sourceApp)
+        }.toString()
     }
 }
