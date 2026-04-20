@@ -1,6 +1,7 @@
 package com.cachekid.companion.host.mission
 
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.net.Socket
@@ -32,6 +33,35 @@ class MissionPackageReceiverServerTest {
             assertTrue(statusMessages.any { it.contains("Mission empfangen") })
         } finally {
             server.stop()
+        }
+    }
+
+    @Test
+    fun `receiver server reports port conflicts instead of crashing`() {
+        val firstStatusMessages = mutableListOf<String>()
+        val secondStatusMessages = mutableListOf<String>()
+        val tempDir = createTempDirectory("cachekid-receiver-conflict").toFile()
+        val firstServer = MissionPackageReceiverServer(
+            baseDirectory = tempDir,
+            port = 0,
+            onStatusChanged = { firstStatusMessages.add(it) },
+        )
+        val firstPort = requireNotNull(firstServer.start())
+
+        val secondServer = MissionPackageReceiverServer(
+            baseDirectory = tempDir,
+            port = firstPort,
+            onStatusChanged = { secondStatusMessages.add(it) },
+        )
+
+        try {
+            val secondPort = secondServer.start()
+
+            assertNull(secondPort)
+            assertTrue(secondStatusMessages.any { it.contains("bereits belegt") })
+        } finally {
+            firstServer.stop()
+            secondServer.stop()
         }
     }
 

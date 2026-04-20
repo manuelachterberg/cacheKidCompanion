@@ -7,14 +7,16 @@ class MissionPackageValidator {
     fun validate(missionPackage: MissionPackage): MissionPackageValidationResult {
         val errors = buildList {
             val paths = missionPackage.files.map { it.path }.toSet()
-            val missing = MissionPackageSchema.requiredManifestFiles.toSet() - paths
+            val missing = MissionPackageSchema.requiredCoreFiles.toSet() - paths
             if (missing.isNotEmpty()) {
                 add("Mission package is missing required files: ${missing.sorted().joinToString(", ")}")
             }
 
-            val manifestFile = missionPackage.files.firstOrNull { it.path == "manifest.json" }
-            val integrityFile = missionPackage.files.firstOrNull { it.path == "integrity.json" }
-            val missionFile = missionPackage.files.firstOrNull { it.path == "mission.json" }
+            val manifestFile = missionPackage.files.firstOrNull { it.path == MissionPackageSchema.MANIFEST_FILE }
+            val integrityFile = missionPackage.files.firstOrNull { it.path == MissionPackageSchema.INTEGRITY_FILE }
+            val missionFile = missionPackage.files.firstOrNull { it.path == MissionPackageSchema.MISSION_FILE }
+            val mapMetaFile = missionPackage.files.firstOrNull { it.path == MissionPackageSchema.MAP_METADATA_FILE }
+            val mapSvgFile = missionPackage.files.firstOrNull { it.path == MissionPackageSchema.MAP_SVG_FILE }
 
             if (manifestFile != null) {
                 val manifestMissionId = extractStringValue(manifestFile.content, "missionId")
@@ -27,8 +29,11 @@ class MissionPackageValidator {
                 if (manifestSchemaVersion != MissionPackageSchema.CURRENT_SCHEMA_VERSION) {
                     add("Manifest schemaVersion is not supported.")
                 }
-                if (manifestFileNames.toSet() != MissionPackageSchema.requiredManifestFiles.toSet()) {
-                    add("Manifest file list does not match the required mission package layout.")
+                if (!manifestFileNames.containsAll(MissionPackageSchema.requiredCoreFiles)) {
+                    add("Manifest file list is missing required mission package files.")
+                }
+                if (manifestFileNames.toSet() != paths) {
+                    add("Manifest file list does not match the actual mission package files.")
                 }
             }
 
@@ -38,6 +43,10 @@ class MissionPackageValidator {
                 if (expectedSha != actualSha) {
                     add("Integrity checksum does not match mission.json.")
                 }
+            }
+
+            if ((mapMetaFile == null) != (mapSvgFile == null)) {
+                add("Offline map assets must include both map-meta.json and map.svg.")
             }
         }
 

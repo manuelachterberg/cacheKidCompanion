@@ -27,6 +27,28 @@ class MissionPackageWriterTest {
     }
 
     @Test
+    fun `writer includes optional offline map files when present`() {
+        val result = writer.write(
+            validDraft().copy(
+                offlineMap = MissionOfflineMap(
+                    svgContent = "<path d=\"M 0 0 L 10 10\" />",
+                    bounds = MissionMapBounds(
+                        minLatitude = 52.5,
+                        minLongitude = 13.3,
+                        maxLatitude = 52.6,
+                        maxLongitude = 13.5,
+                    ),
+                ),
+            ),
+        )
+
+        val missionPackage = requireNotNull(result.missionPackage)
+
+        assertTrue(missionPackage.files.any { it.path == MissionPackageSchema.MAP_SVG_FILE })
+        assertTrue(missionPackage.files.any { it.path == MissionPackageSchema.MAP_METADATA_FILE })
+    }
+
+    @Test
     fun `writer includes integrity checksum for mission json`() {
         val result = writer.write(validDraft())
 

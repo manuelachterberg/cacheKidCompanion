@@ -5,7 +5,7 @@ import java.io.File
 class MissionPackageFileStore {
 
     fun store(baseDirectory: File, missionPackage: MissionPackage): MissionPackageStoreResult {
-        val expectedFiles = MissionPackageSchema.requiredManifestFiles.toSet()
+        val expectedFiles = MissionPackageSchema.requiredCoreFiles.toSet()
         val actualFiles = missionPackage.files.map { it.path }.toSet()
         val missingFiles = expectedFiles - actualFiles
         if (missingFiles.isNotEmpty()) {

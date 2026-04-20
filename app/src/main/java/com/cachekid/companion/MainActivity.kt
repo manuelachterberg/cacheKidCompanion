@@ -20,6 +20,8 @@ import com.cachekid.companion.host.importing.HostShareImportService
 import com.cachekid.companion.host.importing.MissionDraftFactory
 import com.cachekid.companion.host.importing.SharedCacheImportResult
 import com.cachekid.companion.host.importing.SharedTextPayload
+import com.cachekid.companion.host.mission.ActiveMission
+import com.cachekid.companion.host.mission.ActiveMissionRepository
 import com.cachekid.companion.host.mission.MissionDraft
 import com.cachekid.companion.host.mission.MissionPackageFileStore
 import com.cachekid.companion.host.mission.MissionPackageReceiverServer
@@ -52,10 +54,12 @@ class MainActivity : AppCompatActivity() {
     private val missionPackageSenderClient = MissionPackageSenderClient()
     private val missionTargetParser = MissionTargetParser()
     private val hostMissionBuilderPresenter = HostMissionBuilderPresenter(missionTargetParser)
+    private val activeMissionRepository = ActiveMissionRepository()
 
     private var pendingImportResult: SharedCacheImportResult? = null
     private var pendingResolutionResult: CacheResolutionResult? = null
     private var pendingMissionDraft: MissionDraft? = null
+    private var activeMission: ActiveMission? = null
     private var pendingShareDebug: String? = null
     private var storedMissionResult: MissionPackageStoreResult? = null
     private var sendMissionResult: MissionPackageSendResult? = null
@@ -90,6 +94,7 @@ class MainActivity : AppCompatActivity() {
             getPendingImportSummary = ::pendingImportSummary,
             getPendingShareDebugAction = { pendingShareDebug },
             getPendingMissionDraft = { pendingMissionDraft },
+            getActiveMission = { activeMission },
             getPendingResolution = { pendingResolutionResult },
             updatePendingMissionDraftAction = ::updatePendingMissionDraft,
             resolvePendingCacheManuallyAction = ::resolvePendingCacheManually,
@@ -170,6 +175,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        activeMission = loadActiveMission()
         handleShareIntent(intent)
         refreshNativeImportPanel()
         refreshReceivePanel()
@@ -290,6 +296,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshNativeImportPanel() {
+        val shouldHideForActiveMission =
+            activeMission != null &&
+                pendingImportResult == null &&
+                pendingResolutionResult == null &&
+                pendingMissionDraft == null &&
+                pendingShareDebug == null
+        if (shouldHideForActiveMission) {
+            binding.nativeImportPanel.visibility = View.GONE
+            return
+        }
+
         val panelState = hostMissionBuilderPresenter.present(
             importSummary = pendingImportSummary(),
             shareDebug = pendingShareDebug,
@@ -368,6 +385,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshReceivePanel() {
+        val shouldHideForActiveMission =
+            activeMission != null &&
+                pendingImportResult == null &&
+                pendingResolutionResult == null &&
+                pendingMissionDraft == null &&
+                pendingShareDebug == null
+        if (shouldHideForActiveMission) {
+            binding.nativeReceivePanel.visibility = View.GONE
+            return
+        }
+
+        binding.nativeReceivePanel.visibility = View.VISIBLE
         binding.nativeReceiveStatus.text = receiveStatusText
         binding.nativeReceiveToggleButton.text = if (receiveServerRunning) {
             "Empfang stoppen"
@@ -491,8 +520,24 @@ class MainActivity : AppCompatActivity() {
             baseDirectory = missionsDirectory,
             missionPackage = missionPackage,
         )
+        val result = storedMissionResult
+        if (result?.isSuccess == true) {
+            activeMission = result.missionDirectory?.let { missionDirectory ->
+                activeMissionRepository.loadFromDirectory(missionDirectory)
+            }
+            pendingImportResult = null
+            pendingResolutionResult = null
+            pendingMissionDraft = null
+            pendingShareDebug = null
+            storedMissionResult = null
+            sendMissionResult = null
+            if (::nativeBridge.isInitialized) {
+                nativeBridge.notifyActiveMissionUpdated()
+                nativeBridge.notifyImportUpdated()
+            }
+        }
         refreshNativeImportPanel()
-        return storedMissionResult
+        return result
     }
 
     private fun sendPendingMissionDraft(host: String, portText: String): MissionPackageSendResult? {
@@ -535,12 +580,31 @@ class MainActivity : AppCompatActivity() {
                     refreshReceivePanel()
                 }
             },
+            onMissionImported = { _ ->
+                val latestMission = loadActiveMission()
+                runOnUiThread {
+                    activeMission = latestMission
+                    if (::nativeBridge.isInitialized) {
+                        nativeBridge.notifyActiveMissionUpdated()
+                    }
+                }
+            },
         )
         val port = server.start()
+        if (port == null) {
+            receiveServer = null
+            receiveServerRunning = false
+            refreshReceivePanel()
+            return
+        }
         receiveServer = server
         receiveServerRunning = true
         receiveStatusText = "Empfang aktiv auf Port $port."
         refreshReceivePanel()
+    }
+
+    private fun loadActiveMission(): ActiveMission? {
+        return activeMissionRepository.loadLatest(File(filesDir, MISSION_STORAGE_DIRECTORY))
     }
 
     private companion object {
