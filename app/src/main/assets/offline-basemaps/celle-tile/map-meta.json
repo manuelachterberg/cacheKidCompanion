@@ -1,0 +1,9 @@
+{
+  "assetPath": "map.svg",
+  "bounds": {
+    "minLatitude": 52.60,
+    "minLongitude": 10.04,
+    "maxLatitude": 52.65,
+    "maxLongitude": 10.11
+  }
+}

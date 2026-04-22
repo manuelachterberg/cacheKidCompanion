@@ -64,6 +64,28 @@ class MissionPackageWriterTest {
     }
 
     @Test
+    fun `writer includes optional waypoints in mission json`() {
+        val result = writer.write(
+            validDraft().copy(
+                routeOrigin = MissionTarget(52.5200, 13.4040),
+                waypoints = listOf(
+                    MissionWaypoint(52.5205, 13.4050, "Start"),
+                    MissionWaypoint(52.5210, 13.4060, "Ecke"),
+                ),
+            ),
+        )
+
+        val missionFile = requireNotNull(result.missionPackage)
+            .files
+            .first { it.path == "mission.json" }
+
+        assertTrue(missionFile.content.contains(""""routeOrigin""""))
+        assertTrue(missionFile.content.contains(""""waypoints""""))
+        assertTrue(missionFile.content.contains(""""label": "Start""""))
+        assertTrue(missionFile.content.contains(""""latitude": 52.521"""))
+    }
+
+    @Test
     fun `writer returns validation errors for invalid draft`() {
         val result = writer.write(
             MissionDraft(

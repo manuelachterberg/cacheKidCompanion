@@ -8,7 +8,7 @@ class OverpassQueryBuilder {
         val query = """
             [out:json][timeout:25];
             (
-              way["highway"](${bbox(bounds)});
+              way["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|service|track|path|footway|cycleway"](${bbox(bounds)});
               way["waterway"](${bbox(bounds)});
               way["natural"="water"](${bbox(bounds)});
               way["landuse"="forest"](${bbox(bounds)});

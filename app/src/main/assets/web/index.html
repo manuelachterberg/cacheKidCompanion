@@ -10,6 +10,16 @@
   <main class="app-shell">
     <section id="kidMissionView" class="kid-mission" hidden>
       <section class="kid-compass-panel">
+        <div class="kid-compass-shell">
+          <div class="kid-compass-ring">
+            <img class="kid-compass-base" src="./compass.png" alt="" aria-hidden="true" />
+            <div id="kidCompassDialRotor" class="kid-compass-dial-rotor" aria-hidden="true">
+              <img id="kidCompassDial" class="kid-compass-dial" src="./compass-ziffernblatt.png" alt="" aria-hidden="true" />
+            </div>
+            <div id="kidCompassNeedle" class="kid-compass-needle" hidden></div>
+          </div>
+        </div>
+
         <div class="kid-distance-cluster">
           <div id="kidDistanceValue" class="kid-distance-value">--</div>
           <div class="kid-distance-scale">
@@ -17,16 +27,7 @@
           </div>
         </div>
 
-        <div class="kid-compass-shell">
-          <div class="kid-compass-ring">
-            <span class="kid-cardinal kid-cardinal--north">N</span>
-            <span class="kid-cardinal kid-cardinal--east">O</span>
-            <span class="kid-cardinal kid-cardinal--south">S</span>
-            <span class="kid-cardinal kid-cardinal--west">W</span>
-            <div id="kidCompassNeedle" class="kid-compass-needle" hidden></div>
-            <div id="kidCompassTreasure" class="kid-compass-treasure">✦</div>
-          </div>
-        </div>
+        <div id="kidHeadingDebug" class="kid-heading-debug">heading --</div>
       </section>
 
       <section class="kid-map-panel">
@@ -35,9 +36,14 @@
           <g id="kidMapTerrain"></g>
           <path id="kidMapRouteGlow" class="kid-map-route-glow" d="" />
           <path id="kidMapRoute" class="kid-map-route" d="" />
-          <text id="kidMapTarget" class="kid-map-target" x="50" y="34">X</text>
-          <circle id="kidMapPlayerOuter" class="kid-map-player-outer" cx="50" cy="104" r="5.5"></circle>
-          <circle id="kidMapPlayerInner" class="kid-map-player-inner" cx="50" cy="104" r="3.4"></circle>
+          <g id="kidMapTargetMarker" class="kid-map-target-marker" transform="translate(50 34) scale(1)">
+            <path class="kid-map-target-stroke kid-map-target-stroke-a" d="M -6 -7 L 5 7" />
+            <path class="kid-map-target-stroke kid-map-target-stroke-b" d="M 6 -6 L -5 8" />
+          </g>
+          <g id="kidMapPlayerMarker" class="kid-map-player-marker" transform="translate(50 104)">
+            <circle class="kid-map-player-ring" cx="0" cy="0" r="5.7"></circle>
+            <path class="kid-map-player-scribble" d="M -2.4 -1.6 C -0.8 -3.4 2.2 -3.0 2.8 -0.4 C 3.2 1.8 1.8 3.5 -0.2 3.1 C -2.4 2.7 -3.5 0.3 -2.4 -1.6 Z" />
+          </g>
         </svg>
       </section>
     </section>

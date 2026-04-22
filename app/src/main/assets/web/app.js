@@ -10,6 +10,7 @@
   const state = {
     target: { latitude: 52.520008, longitude: 13.404954 },
     headingDegrees: null,
+    mapBearingDegrees: null,
     location: null,
     bearingDegrees: null,
     arrowDegrees: 0,
@@ -31,12 +32,14 @@
     kidMissionView: document.getElementById("kidMissionView"),
     kidDistanceValue: document.getElementById("kidDistanceValue"),
     kidDistanceScaleFill: document.getElementById("kidDistanceScaleFill"),
+    kidHeadingDebug: document.getElementById("kidHeadingDebug"),
+    kidCompassDialRotor: document.getElementById("kidCompassDialRotor"),
+    kidCompassDial: document.getElementById("kidCompassDial"),
     kidCompassNeedle: document.getElementById("kidCompassNeedle"),
-    kidCompassTreasure: document.getElementById("kidCompassTreasure"),
     kidMapTerrain: document.getElementById("kidMapTerrain"),
     kidMapRouteGlow: document.getElementById("kidMapRouteGlow"),
     kidMapRoute: document.getElementById("kidMapRoute"),
-    kidMapTarget: document.getElementById("kidMapTarget"),
+    kidMapTargetMarker: document.getElementById("kidMapTargetMarker"),
     appEyebrow: document.getElementById("appEyebrow"),
     appTitle: document.getElementById("appTitle"),
     missionOverviewCard: document.getElementById("missionOverviewCard"),
@@ -120,6 +123,7 @@
   function renderActiveMission() {
     const hasActiveMission = Boolean(state.activeMission);
     document.body.classList.toggle("kid-mode", hasActiveMission && state.hasNativeHost);
+    document.body.classList.toggle("native-map-mode", hasActiveMission && state.hasNativeHost);
 
     if (!hasActiveMission) {
       ui.missionOverviewCard.hidden = true;
@@ -177,12 +181,21 @@
       ui.kidDistanceScaleFill.style.width = "0%";
     }
 
-    const hasStableHeading = typeof state.headingDegrees === "number" && typeof state.bearingDegrees === "number";
+    const dialBearing = typeof state.mapBearingDegrees === "number"
+      ? state.mapBearingDegrees
+      : state.headingDegrees;
+    const hasStableHeading = typeof dialBearing === "number" && typeof state.bearingDegrees === "number";
     ui.kidCompassNeedle.hidden = !hasStableHeading;
-    ui.kidCompassTreasure.hidden = hasStableHeading;
+
+    if (typeof dialBearing === "number") {
+      ui.kidCompassDialRotor.style.transform = `rotate(${-dialBearing}deg) scale(1.02)`;
+    } else {
+      ui.kidCompassDialRotor.style.transform = "rotate(0deg) scale(1.02)";
+    }
 
     if (hasStableHeading) {
-      ui.kidCompassNeedle.style.transform = `rotate(${state.arrowDegrees}deg)`;
+      const arrowDegrees = calculateArrowDegrees(dialBearing, state.bearingDegrees);
+      ui.kidCompassNeedle.style.transform = `rotate(${arrowDegrees}deg)`;
     }
   }
 
@@ -211,18 +224,27 @@
 
     ui.kidMapRouteGlow.setAttribute("d", routePath);
     ui.kidMapRoute.setAttribute("d", routePath);
-    ui.kidMapTarget.setAttribute("x", targetX.toFixed(2));
-    ui.kidMapTarget.setAttribute("y", targetY.toFixed(2));
 
-    const targetSize = distanceMeters == null
-      ? 12
-      : clamp(12 + ((160 - Math.min(distanceMeters, 160)) / 20), 12, 19);
-    ui.kidMapTarget.style.fontSize = `${targetSize}px`;
+    const targetScale = distanceMeters == null
+      ? 1
+      : clamp(1 + ((180 - Math.min(distanceMeters, 180)) / 150), 1, 2.15);
+    ui.kidMapTargetMarker.setAttribute(
+      "transform",
+      `translate(${targetX.toFixed(2)} ${targetY.toFixed(2)}) scale(${targetScale.toFixed(2)})`,
+    );
 
     renderKidTerrain(relativeAngle, targetX, targetY);
   }
 
   function renderKidTerrain(relativeAngle, targetX, targetY) {
+    if (state.activeMission && state.hasNativeHost) {
+      ui.kidMapTerrain.innerHTML = "";
+      return;
+    }
+    if (state.activeMission?.baseMap?.svgContent) {
+      ui.kidMapTerrain.innerHTML = state.activeMission.baseMap.svgContent;
+      return;
+    }
     if (state.activeMission?.offlineMap?.svgContent) {
       ui.kidMapTerrain.innerHTML = state.activeMission.offlineMap.svgContent;
       return;
@@ -447,6 +469,16 @@
         longitude: payload.longitude,
       };
       state.sourceLabel = typeof state.headingDegrees === "number" ? "Native Sensor + GPS" : "Native GPS";
+      render();
+      return;
+    }
+
+    if (type === "map-orientation") {
+      state.mapBearingDegrees =
+        typeof payload.mapBearingDegrees === "number" ? payload.mapBearingDegrees : null;
+      if (typeof payload.targetBearingDegrees === "number") {
+        state.bearingDegrees = payload.targetBearingDegrees;
+      }
       render();
       return;
     }

@@ -1,13 +1,17 @@
 :root {
   color-scheme: light;
-  --bg: #f3f1e7;
-  --panel: #fffdf8;
+  --bg: #ffffff;
+  --panel: #ffffff;
   --ink: #151515;
-  --muted: #5d5d55;
-  --line: #d8d1bf;
+  --muted: #4f4f4f;
+  --line: #dddddd;
   --accent: #6b7a40;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
   font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+html {
+  background: transparent;
 }
 
 * {
@@ -17,9 +21,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top, rgba(107, 122, 64, 0.12), transparent 32%),
-    linear-gradient(180deg, #f7f4eb 0%, var(--bg) 100%);
+  background: var(--bg);
   color: var(--ink);
 }
 
@@ -31,6 +33,29 @@ body {
 
 .kid-mission {
   min-height: calc(100vh - 32px);
+}
+
+body.kid-mode {
+  background: #ffffff;
+}
+
+body.native-map-mode {
+  background: transparent;
+}
+
+body.kid-mode .app-shell {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+body.native-map-mode .app-shell {
+  background: transparent;
+}
+
+body.native-map-mode .kid-mission {
+  background: transparent;
 }
 
 .kid-compass-panel,
@@ -46,49 +71,41 @@ body {
   min-height: 30vh;
   margin-bottom: 14px;
   padding: 18px 18px 12px;
-  background:
-    radial-gradient(circle at 50% 28%, rgba(107, 122, 64, 0.16), transparent 46%),
-    linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,245,236,0.96) 100%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.82) 52%, rgba(255, 255, 255, 0) 100%);
 }
 
 .kid-distance-cluster {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 12px;
+  justify-content: center;
+  gap: 0;
+  margin-top: 14px;
+  margin-bottom: 0;
+}
+
+.kid-heading-debug {
+  display: none;
 }
 
 .kid-distance-value {
-  font-size: clamp(1.6rem, 6vw, 2.8rem);
+  font-size: clamp(2.1rem, 8vw, 3.6rem);
   line-height: 1;
   font-weight: 700;
   letter-spacing: 0.04em;
+  color: var(--ink);
+  -webkit-text-stroke: 6px rgba(255, 255, 255, 0.96);
+  paint-order: stroke fill;
+  text-shadow:
+    0 0 1px rgba(255, 255, 255, 0.98),
+    0 0 8px rgba(255, 255, 255, 0.9);
 }
 
 .kid-distance-scale {
-  flex: 1;
-  height: 12px;
-  border-radius: 999px;
-  border: 2px solid rgba(21, 21, 21, 0.22);
-  background:
-    repeating-linear-gradient(
-      90deg,
-      rgba(21, 21, 21, 0.05) 0,
-      rgba(21, 21, 21, 0.05) 8%,
-      transparent 8%,
-      transparent 14%
-    );
-  overflow: hidden;
+  display: none;
 }
 
 .kid-distance-scale span {
-  display: block;
-  height: 100%;
-  width: 0%;
-  border-radius: inherit;
-  background:
-    linear-gradient(90deg, rgba(21, 21, 21, 0.12), rgba(21, 21, 21, 0.58));
+  display: none;
 }
 
 .kid-compass-shell {
@@ -100,13 +117,35 @@ body {
   position: relative;
   width: min(68vw, 220px);
   aspect-ratio: 1;
-  border-radius: 50%;
-  border: 4px solid var(--ink);
-  background:
-    radial-gradient(circle at center, rgba(255,255,255,0.85) 0%, rgba(244,240,229,0.95) 58%, rgba(224,216,195,0.9) 100%);
-  box-shadow:
-    inset 0 0 0 8px rgba(21, 21, 21, 0.04),
-    0 14px 36px rgba(0, 0, 0, 0.08);
+  overflow: visible;
+  box-shadow: none;
+}
+
+.kid-compass-base,
+.kid-compass-dial,
+.kid-compass-dial-rotor {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+
+.kid-compass-base,
+.kid-compass-dial {
+  object-fit: contain;
+  object-position: center center;
+}
+
+.kid-compass-dial-rotor {
+  inset: 4% 0 -4% 0;
+  transform: rotate(0deg);
+  transform-origin: center center;
+}
+
+.kid-compass-dial {
+  inset: 0;
 }
 
 .kid-cardinal {
@@ -114,6 +153,7 @@ body {
   font-size: 1.15rem;
   font-weight: 700;
   color: var(--ink);
+  display: none;
 }
 
 .kid-cardinal--north { top: 12px; left: 50%; transform: translateX(-50%); }
@@ -123,63 +163,64 @@ body {
 
 .kid-compass-needle {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 16px;
-  height: 88px;
-  transform-origin: center 76px;
-  margin-left: -8px;
-  margin-top: -72px;
+  inset: 0;
+  transform-origin: center center;
+  z-index: 3;
 }
 
 .kid-compass-needle::before {
   content: "";
   position: absolute;
   left: 50%;
-  top: 0;
+  top: 8px;
   transform: translateX(-50%);
   width: 0;
   height: 0;
-  border-left: 20px solid transparent;
-  border-right: 20px solid transparent;
-  border-bottom: 78px solid var(--ink);
-  filter: drop-shadow(0 8px 0 rgba(107, 122, 64, 0.18));
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-bottom: 30px solid var(--ink);
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.95));
 }
 
 .kid-compass-needle::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: 6px;
-  transform: translateX(-50%);
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--ink);
-}
-
-.kid-compass-treasure {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: 4rem;
-  color: rgba(21, 21, 21, 0.92);
+  content: none;
 }
 
 .kid-map-panel {
   position: relative;
   min-height: 62vh;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(243, 239, 226, 0.98) 0%, rgba(237, 231, 213, 0.98) 100%);
+  background: #ffffff;
+}
+
+body.kid-mode .kid-compass-panel,
+body.kid-mode .kid-map-panel {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body.kid-mode .kid-compass-panel {
+  min-height: 28vh;
+  margin: 0;
+  padding: 4px 16px 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.90) 42%, rgba(255, 255, 255, 0.24) 72%, rgba(255, 255, 255, 0) 100%);
+}
+
+body.kid-mode .kid-map-panel {
+  min-height: 72vh;
+  background: transparent;
+}
+
+body.native-map-mode .kid-map-panel {
+  display: none;
 }
 
 .kid-map-fade {
   position: absolute;
   inset: 0 0 auto 0;
   height: 78px;
-  background: linear-gradient(180deg, rgba(247, 244, 235, 0.96) 0%, rgba(247, 244, 235, 0) 100%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0) 100%);
   z-index: 1;
   pointer-events: none;
 }
@@ -190,6 +231,7 @@ body {
   width: 100%;
   height: 100%;
   display: block;
+  overflow: visible;
 }
 
 .kid-map-terrain-line,
@@ -212,7 +254,7 @@ body {
 .kid-map-route-glow {
   fill: none;
   stroke: rgba(255, 255, 255, 0.9);
-  stroke-width: 6;
+  stroke-width: 7;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -220,28 +262,94 @@ body {
 .kid-map-route {
   fill: none;
   stroke: rgba(21, 21, 21, 0.92);
-  stroke-width: 2.6;
+  stroke-width: 3;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-dasharray: 4 5;
+  stroke-dasharray: 3 6;
 }
 
-.kid-map-target {
-  font-size: 12px;
-  font-weight: 700;
-  fill: rgba(21, 21, 21, 0.96);
-  text-anchor: middle;
-  dominant-baseline: middle;
+.kid-map-target-marker {
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
-.kid-map-player-outer {
-  fill: rgba(255, 255, 255, 0.96);
-  stroke: rgba(21, 21, 21, 0.95);
-  stroke-width: 2;
+.kid-map-target-stroke {
+  fill: none;
+  stroke: rgba(21, 21, 21, 0.96);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.kid-map-player-inner {
-  fill: rgba(21, 21, 21, 0.95);
+.kid-map-target-stroke-a {
+  stroke-width: 2.8;
+}
+
+.kid-map-target-stroke-b {
+  stroke-width: 2.2;
+}
+
+.kid-map-player-marker {
+}
+
+.kid-map-player-ring {
+  fill: rgba(255, 255, 255, 0.97);
+  stroke: rgba(21, 21, 21, 0.96);
+  stroke-width: 2.2;
+}
+
+.kid-map-player-scribble {
+  fill: none;
+  stroke: rgba(21, 21, 21, 0.94);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.kid-map-osm-layer path {
+  fill: none;
+  shape-rendering: geometricPrecision;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: butt;
+  stroke-linejoin: round;
+}
+
+.kid-map-osm-water-fill,
+.kid-map-osm-forest-fill {
+  stroke: none;
+  shape-rendering: geometricPrecision;
+}
+
+.kid-map-osm-water-fill {
+  fill: rgba(21, 21, 21, 0.04);
+}
+
+.kid-map-osm-forest-fill {
+  fill: rgba(21, 21, 21, 0.03);
+}
+
+.kid-map-osm-road {
+  stroke: rgba(21, 21, 21, 0.14);
+  stroke-width: 1.4;
+}
+
+.kid-map-osm-road-strong {
+  stroke: rgba(21, 21, 21, 0.2);
+  stroke-width: 1.9;
+}
+
+.kid-map-osm-water {
+  stroke: rgba(21, 21, 21, 0.1);
+  stroke-width: 1.4;
+}
+
+.kid-map-osm-forest {
+  stroke: rgba(21, 21, 21, 0.07);
+  stroke-width: 1.2;
+}
+
+.kid-map-osm-terrain {
+  display: none;
 }
 
 .topbar,
@@ -490,6 +598,20 @@ body:not(.kid-mode) .kid-mission {
 body.kid-mode .app-shell {
   width: min(720px, 100%);
   padding-top: 12px;
+}
+
+body.native-map-mode .kid-map-panel {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+body.native-map-mode .kid-map-svg {
+  background: transparent;
+}
+
+body.native-map-mode .kid-map-fade {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0) 100%);
 }
 
 @media (max-width: 720px) {

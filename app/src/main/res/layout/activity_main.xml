@@ -4,10 +4,75 @@
     android:layout_height="match_parent"
     android:background="@android:color/white">
 
+    <FrameLayout
+        android:id="@+id/launchSplashOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/splash_background"
+        android:clickable="true"
+        android:focusable="true"
+        android:elevation="24dp">
+
+        <ImageView
+            android:id="@+id/launchSplashLogo"
+            android:layout_width="280dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:adjustViewBounds="true"
+            android:contentDescription="@string/app_name"
+            android:src="@drawable/cachekid_splash_logo" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/nativeKidMapContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/kidTopWhiteInset"
+        android:layout_width="match_parent"
+        android:layout_height="32dp"
+        android:background="@android:color/white"
+        android:visibility="gone" />
+
     <WebView
         android:id="@+id/webView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
+
+    <FrameLayout
+        android:id="@+id/kidZoneDebugOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="false"
+        android:focusable="false"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/kidTargetZoneMarker"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:background="#33FF7043"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="12dp"
+            android:text="X-ZONE"
+            android:textColor="#AA4E1A"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/kidOriginZoneMarker"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:background="#332196F3"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="12dp"
+            android:text="O-ZONE"
+            android:textColor="#AA0D47A1"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </FrameLayout>
 
     <LinearLayout
         android:id="@+id/nativeImportPanel"
@@ -45,6 +110,22 @@
             android:layout_marginTop="6dp"
             android:textColor="#5D5D55"
             android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/nativeGeocachingLoginStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Geocaching-Login: nicht verbunden."
+            android:textColor="#5D5D55"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/nativeGeocachingLoginButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Geocaching-Login verbinden" />
 
         <EditText
             android:id="@+id/nativeResolutionTitleInput"

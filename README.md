@@ -26,6 +26,7 @@ Implemented:
   - `ACTION_SEND` text payloads
   - `coord.info/GC...` links
   - partial vs resolved import states
+  - Geocaching login/session capture in a host-side WebView
 - first parent-side resolution flow:
   - detect shared cache code
   - manually complete missing title and coordinates
@@ -47,7 +48,7 @@ The intended split is:
 
 - `iphone host`
   - cache intake from the Geocaching app
-  - online cache resolution
+  - authenticated online cache resolution against the logged-in Geocaching session
   - mission creation
   - route and waypoint preparation
   - mission transfer to the Meebook
@@ -96,6 +97,12 @@ Rule of thumb:
 
 - iPhone = online host and mission builder
 - Meebook = offline mission player with a locally installed offline map base
+
+Important resolver rule:
+
+- anonymous `coord.info` fetches are not reliable enough for exact coordinates
+- the long-term exact resolve path belongs to an authenticated host session
+- anonymous HTML fetch and public geocoding are fallback behavior only
 
 ### Component flow
 

@@ -177,6 +177,16 @@ class NativeBridge(
         )
     }
 
+    fun notifyMapOrientation(mapBearingDegrees: Double?, targetBearingDegrees: Double?) {
+        emitEvent(
+            type = "map-orientation",
+            payload = JSONObject().apply {
+                put("mapBearingDegrees", mapBearingDegrees)
+                put("targetBearingDegrees", targetBearingDegrees)
+            },
+        )
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     private fun emitLocationEvent(location: Location) {
         emitEvent(
@@ -217,6 +227,15 @@ class NativeBridge(
                     put("longitude", target.longitude)
                 },
             )
+            put(
+                "routeOrigin",
+                routeOrigin?.let {
+                    JSONObject().apply {
+                        put("latitude", it.latitude)
+                        put("longitude", it.longitude)
+                    }
+                },
+            )
             put("sourceApp", sourceApp)
         }.toString()
     }
@@ -235,10 +254,37 @@ class NativeBridge(
                     put("longitude", target.longitude)
                 },
             )
+            put(
+                "routeOrigin",
+                routeOrigin?.let {
+                    JSONObject().apply {
+                        put("latitude", it.latitude)
+                        put("longitude", it.longitude)
+                    }
+                },
+            )
             put("sourceApp", sourceApp)
             put(
                 "offlineMap",
                 offlineMap?.let { map ->
+                    JSONObject().apply {
+                        put("assetPath", map.assetPath)
+                        put("svgContent", map.svgContent)
+                        put(
+                            "bounds",
+                            JSONObject().apply {
+                                put("minLatitude", map.bounds.minLatitude)
+                                put("minLongitude", map.bounds.minLongitude)
+                                put("maxLatitude", map.bounds.maxLatitude)
+                                put("maxLongitude", map.bounds.maxLongitude)
+                            },
+                        )
+                    }
+                },
+            )
+            put(
+                "baseMap",
+                baseMap?.let { map ->
                     JSONObject().apply {
                         put("assetPath", map.assetPath)
                         put("svgContent", map.svgContent)

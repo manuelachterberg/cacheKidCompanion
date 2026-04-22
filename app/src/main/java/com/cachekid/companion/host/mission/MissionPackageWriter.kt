@@ -63,6 +63,28 @@ class MissionPackageWriter(
     private fun buildMissionJson(draft: MissionDraft, missionId: String): String {
         val escapedSourceApp = draft.sourceApp?.let { "\"${escapeJson(it)}\"" } ?: "null"
         val hasOfflineMapAsset = draft.offlineMap?.svgContent?.isNotBlank() == true
+        val routeOriginJson = draft.routeOrigin?.let { routeOrigin ->
+            """
+              "routeOrigin": {
+                "latitude": ${routeOrigin.latitude},
+                "longitude": ${routeOrigin.longitude}
+              },
+            """.trimIndent()
+        } ?: ""
+        val waypointsJson = if (draft.waypoints.isEmpty()) {
+            ""
+        } else {
+            draft.waypoints.joinToString(",\n", prefix = "  \"waypoints\": [\n", postfix = "\n  ],") { waypoint ->
+                val escapedLabel = waypoint.label?.let { "\"${escapeJson(it)}\"" } ?: "null"
+                """
+                    {
+                      "latitude": ${waypoint.latitude},
+                      "longitude": ${waypoint.longitude},
+                      "label": $escapedLabel
+                    }
+                """.trimIndent().prependIndent("    ")
+            }
+        }
         return """
             {
               "schemaVersion": ${MissionPackageSchema.CURRENT_SCHEMA_VERSION},
@@ -75,6 +97,8 @@ class MissionPackageWriter(
                 "latitude": ${draft.target.latitude},
                 "longitude": ${draft.target.longitude}
               },
+${routeOriginJson.ifBlank { "" }}
+${waypointsJson.ifBlank { "" }}
               "sourceApp": $escapedSourceApp,
               "hasOfflineMap": $hasOfflineMapAsset
             }

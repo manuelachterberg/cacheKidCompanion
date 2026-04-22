@@ -19,6 +19,9 @@ class MissionDraftValidator {
             if (!draft.target.isValid()) {
                 add("Target coordinates must be within valid latitude and longitude ranges.")
             }
+            if (draft.waypoints.any { !it.isValid() }) {
+                add("Waypoint coordinates must be within valid latitude and longitude ranges.")
+            }
         }
 
         return MissionDraftValidationResult(

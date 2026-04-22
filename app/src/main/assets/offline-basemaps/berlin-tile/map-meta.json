@@ -1,0 +1,9 @@
+{
+  "assetPath": "map.png",
+  "bounds": {
+    "minLatitude": 52.50953477032728,
+    "minLongitude": 13.4033203125,
+    "maxLatitude": 52.52290594027806,
+    "maxLongitude": 13.42529296875
+  }
+}

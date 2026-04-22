@@ -35,6 +35,6 @@ class OsmMissionMapSvgRendererTest {
 
         assertTrue(svg.contains("kid-map-osm-road"))
         assertTrue(svg.contains("""M 0 0"""))
-        assertTrue(svg.contains("""L 50 70"""))
+        assertTrue(svg.contains("""L 100 140"""))
     }
 }

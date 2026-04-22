@@ -24,8 +24,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.CacheKidCompanion">
         <activity
+            android:name=".GeocachingLoginActivity"
+            android:exported="false" />
+        <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:theme="@style/Theme.CacheKidCompanion.Launch">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
