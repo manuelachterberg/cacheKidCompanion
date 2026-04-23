@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="CacheKid Companion" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>Ludwig-Hölty</name>
+    <trkseg>
+      <trkpt lat="52.60807666666667" lon="10.068843333333334" />
+      <trkpt lat="52.608213" lon="10.068632" />
+      <trkpt lat="52.608248" lon="10.067947" />
+      <trkpt lat="52.608427" lon="10.06456" />
+      <trkpt lat="52.608218" lon="10.064022" />
+      <trkpt lat="52.608494" lon="10.063185" />
+      <trkpt lat="52.608583" lon="10.061878" />
+      <trkpt lat="52.608871" lon="10.059904" />
+      <trkpt lat="52.609284" lon="10.060025" />
+      <trkpt lat="52.611294" lon="10.061265" />
+      <trkpt lat="52.612885" lon="10.061815" />
+      <trkpt lat="52.614523" lon="10.062353" />
+      <trkpt lat="52.615524" lon="10.062366" />
+      <trkpt lat="52.616201" lon="10.062414" />
+      <trkpt lat="52.617466" lon="10.062782" />
+      <trkpt lat="52.617514" lon="10.063019" />
+      <trkpt lat="52.617626" lon="10.063049" />
+      <trkpt lat="52.617716" lon="10.062861" />
+      <trkpt lat="52.617661" lon="10.062672" />
+      <trkpt lat="52.617792" lon="10.061096" />
+      <trkpt lat="52.61793" lon="10.059442" />
+      <trkpt lat="52.617887" lon="10.058089" />
+      <trkpt lat="52.617757" lon="10.057009" />
+      <trkpt lat="52.617406" lon="10.056146" />
+      <trkpt lat="52.617053" lon="10.054319" />
+      <trkpt lat="52.617" lon="10.054366666666667" />
+    </trkseg>
+  </trk>
+</gpx>

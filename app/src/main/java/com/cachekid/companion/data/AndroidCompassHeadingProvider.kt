@@ -11,6 +11,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
+import kotlin.math.abs
 
 class AndroidCompassHeadingProvider(context: Context) : DeviceHeadingProvider {
 
@@ -29,6 +30,8 @@ class AndroidCompassHeadingProvider(context: Context) : DeviceHeadingProvider {
             private val rotationMatrix = FloatArray(9)
             private val adjustedRotationMatrix = FloatArray(9)
             private val orientation = FloatArray(3)
+            private var smoothedAzimuthDegrees: Double? = null
+            private var lastEmittedDegrees: Float? = null
 
             override fun onSensorChanged(event: SensorEvent) {
                 SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
@@ -46,14 +49,37 @@ class AndroidCompassHeadingProvider(context: Context) : DeviceHeadingProvider {
                 )
                 SensorManager.getOrientation(adjustedRotationMatrix, orientation)
                 val azimuthRadians = orientation[0]
-                val azimuthDegrees = ((Math.toDegrees(azimuthRadians.toDouble()) + 360.0) % 360.0).toFloat()
-                trySend(azimuthDegrees)
+                val rawAzimuthDegrees = normalizeDegrees(Math.toDegrees(azimuthRadians.toDouble()))
+                val previousSmoothed = smoothedAzimuthDegrees
+                val nextSmoothed = if (previousSmoothed == null) {
+                    rawAzimuthDegrees
+                } else {
+                    normalizeDegrees(previousSmoothed + smallestAngleDifference(previousSmoothed, rawAzimuthDegrees) * 0.18)
+                }
+                smoothedAzimuthDegrees = nextSmoothed
+                val nextHeading = nextSmoothed.toFloat()
+                val shouldEmit =
+                    lastEmittedDegrees == null ||
+                        abs(smallestAngleDifference(lastEmittedDegrees!!.toDouble(), nextSmoothed)) >= 1.2
+                if (shouldEmit) {
+                    lastEmittedDegrees = nextHeading
+                    trySend(nextHeading)
+                }
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
         }
 
-        sensorManager.registerListener(listener, rotationSensor, SensorManager.SENSOR_DELAY_GAME)
+        sensorManager.registerListener(listener, rotationSensor, SensorManager.SENSOR_DELAY_UI)
         awaitClose { sensorManager.unregisterListener(listener) }
     }.conflate()
+
+    private fun normalizeDegrees(value: Double): Double = ((value % 360.0) + 360.0) % 360.0
+
+    private fun smallestAngleDifference(from: Double, to: Double): Double {
+        var delta = (to - from) % 360.0
+        if (delta > 180.0) delta -= 360.0
+        if (delta < -180.0) delta += 360.0
+        return delta
+    }
 }

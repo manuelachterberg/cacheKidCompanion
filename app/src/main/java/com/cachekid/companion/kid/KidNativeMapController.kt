@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.Path
 import android.location.Location
+import android.os.SystemClock
 import android.util.Log
 import android.view.View
 import android.widget.FrameLayout
@@ -80,6 +81,7 @@ class KidNativeMapController(
     private var previousCourseLocation: Location? = null
     private var currentCourseBearingDegrees: Double? = null
     private var lastAppliedBearingDegrees: Double? = null
+    private var lastOrientationCommitAtMillis: Long = 0L
     private var displayedMissionId: String? = null
     private var displayedRouteStart: LatLng? = null
     private var lastCameraDebugInfo: CameraDebugInfo? = null
@@ -151,12 +153,14 @@ class KidNativeMapController(
         currentLocation = location
         if (mission == null) {
             lastAppliedBearingDegrees = null
+            lastOrientationCommitAtMillis = 0L
             displayedMissionId = null
             displayedRouteStart = null
             previousCourseLocation = null
             currentCourseBearingDegrees = null
         } else if (missionChanged || displayedMissionId != mission.missionId || displayedRouteStart == null) {
             lastAppliedBearingDegrees = null
+            lastOrientationCommitAtMillis = 0L
             displayedMissionId = mission.missionId
             displayedRouteStart = resolveDisplayRouteStart(mission)
             previousCourseLocation = null
@@ -216,7 +220,10 @@ class KidNativeMapController(
         val routeStart = displayedRouteStart ?: resolveDisplayRouteStart(mission).also {
             displayedRouteStart = it
         }
-        val routePoints = buildRouteLatLngs(mission, routeStart, missionTarget)
+        val livePlayer = resolveLiveRouteStart(mission)
+        val routePoints = buildRouteLatLngs(mission, routeStart, missionTarget).let { basePoints ->
+            if (livePlayer != null) listOf(livePlayer) + basePoints else basePoints
+        }
         Log.d(
             CAMERA_LOG_TAG,
             "updateCamera mission=${mission.missionId} animate=$animate routeStart=${routeStart.latitude},${routeStart.longitude} target=${missionTarget.latitude},${missionTarget.longitude} routePoints=${routePoints.size}",
@@ -247,9 +254,10 @@ class KidNativeMapController(
                 bottomPadding,
             )
             map.moveCamera(update)
-            maximizeZoomForVisibleRoute(
+            maximizeZoomForVisibleEndpoints(
                 map = map,
-                routePoints = routePoints,
+                routeStart = livePlayer ?: routeStart,
+                missionTarget = missionTarget,
                 width = width,
                 height = height,
                 topPadding = topPadding,
@@ -289,11 +297,12 @@ class KidNativeMapController(
             ),
         )
 
-        val routeStartLatLng = displayedRouteStart ?: resolveDisplayRouteStart(mission).also {
+        val fallbackRouteStart = displayedRouteStart ?: resolveDisplayRouteStart(mission).also {
             displayedRouteStart = it
         }
-        val routeStartPoint = Point.fromLngLat(routeStartLatLng.longitude, routeStartLatLng.latitude)
-        val playerPoint = resolvePlayerPoint(routeStartPoint)
+        val activeRoute = resolveActiveRouteState(mission, fallbackRouteStart)
+        val routeStartPoint = Point.fromLngLat(activeRoute.routeStart.longitude, activeRoute.routeStart.latitude)
+        val playerPoint = Point.fromLngLat(activeRoute.playerPoint.longitude, activeRoute.playerPoint.latitude)
         playerSource.setGeoJson(
             FeatureCollection.fromFeatures(
                 buildPlayerFeatures(playerPoint),
@@ -302,14 +311,14 @@ class KidNativeMapController(
 
         val routeFeatures = buildRouteFeatures(
             routeStartPoint = routeStartPoint,
-            waypoints = mission.waypoints.map { waypoint ->
+            waypoints = activeRoute.remainingWaypoints.map { waypoint ->
                 Point.fromLngLat(waypoint.longitude, waypoint.latitude)
             },
             targetPoint = targetPoint,
         )
         Log.d(
             CAMERA_LOG_TAG,
-            "updateMissionOverlays mission=${mission.missionId} routeStart=${routeStartLatLng.latitude},${routeStartLatLng.longitude} waypointCount=${mission.waypoints.size} target=${mission.target.latitude},${mission.target.longitude}",
+            "updateMissionOverlays mission=${mission.missionId} routeStart=${activeRoute.routeStart.latitude},${activeRoute.routeStart.longitude} player=${activeRoute.playerPoint.latitude},${activeRoute.playerPoint.longitude} waypointCount=${activeRoute.remainingWaypoints.size}/${mission.waypoints.size} target=${mission.target.latitude},${mission.target.longitude}",
         )
         routeSource.setGeoJson(FeatureCollection.fromFeatures(routeFeatures))
     }
@@ -400,9 +409,6 @@ class KidNativeMapController(
         waypoints: List<Point>,
         targetPoint: Point,
     ): List<Feature> {
-        if (waypoints.isEmpty()) {
-            return emptyList()
-        }
         val routePoints = buildList {
             add(routeStartPoint)
             addAll(waypoints)
@@ -505,10 +511,6 @@ class KidNativeMapController(
         return bitmap
     }
 
-    private fun resolvePlayerPoint(routeStartPoint: Point): Point {
-        return routeStartPoint
-    }
-
     private fun buildRouteLatLngs(
         mission: ActiveMission,
         routeStart: LatLng,
@@ -533,7 +535,7 @@ class KidNativeMapController(
     }
 
     private fun routeBearingForMission(mission: ActiveMission): Double? {
-        val routeStart = displayedRouteStart ?: return null
+        val routeStart = resolveLiveRouteStart(mission) ?: displayedRouteStart ?: return null
         val missionTarget = LatLng(mission.target.latitude, mission.target.longitude)
         if (!looksLikeCentralEurope(routeStart) || !looksLikeCentralEurope(missionTarget)) {
             return null
@@ -562,6 +564,53 @@ class KidNativeMapController(
         )
     }
 
+    private fun resolveLiveRouteStart(mission: ActiveMission): LatLng? {
+        val current = currentLocation ?: return null
+        val currentLatLng = LatLng(current.latitude, current.longitude)
+        val targetLatLng = LatLng(mission.target.latitude, mission.target.longitude)
+        val isNearTarget = distanceMeters(currentLatLng, targetLatLng) <= 5000.0
+        return currentLatLng.takeIf {
+            looksLikeCentralEurope(it) && isNearTarget
+        }
+    }
+
+    private fun resolveActiveRouteState(
+        mission: ActiveMission,
+        fallbackRouteStart: LatLng,
+    ): ActiveRouteState {
+        val liveRouteStart = resolveLiveRouteStart(mission)
+        if (liveRouteStart == null) {
+            return ActiveRouteState(
+                routeStart = fallbackRouteStart,
+                playerPoint = fallbackRouteStart,
+                remainingWaypoints = mission.waypoints,
+            )
+        }
+        if (mission.waypoints.isEmpty()) {
+            return ActiveRouteState(
+                routeStart = liveRouteStart,
+                playerPoint = liveRouteStart,
+                remainingWaypoints = emptyList(),
+            )
+        }
+
+        val routePoints = buildList {
+            add(fallbackRouteStart)
+            addAll(mission.waypoints.map { LatLng(it.latitude, it.longitude) })
+            add(LatLng(mission.target.latitude, mission.target.longitude))
+        }
+        val nearestIndex = routePoints.indices.minByOrNull { index ->
+            distanceMeters(liveRouteStart, routePoints[index])
+        } ?: 0
+        val dropWaypoints = nearestIndex.coerceIn(0, mission.waypoints.size)
+
+        return ActiveRouteState(
+            routeStart = liveRouteStart,
+            playerPoint = liveRouteStart,
+            remainingWaypoints = mission.waypoints.drop(dropWaypoints),
+        )
+    }
+
     private fun applyOrientationBearing() {
         val map = mapLibreMap ?: return
         val mission = currentMission ?: return
@@ -570,8 +619,13 @@ class KidNativeMapController(
         val currentBearing = normalizeDegrees(currentCamera.bearing)
         val normalizedDesired = normalizeDegrees(desiredBearing)
         val delta = smallestAngleDifference(currentBearing, normalizedDesired)
-        if (kotlin.math.abs(delta) < 2.0) {
+        val now = SystemClock.elapsedRealtime()
+        val elapsedSinceCommit = now - lastOrientationCommitAtMillis
+        if (kotlin.math.abs(delta) < 4.5) {
             lastAppliedBearingDegrees = currentBearing
+            return
+        }
+        if (elapsedSinceCommit < 320L && kotlin.math.abs(delta) < 12.0) {
             return
         }
         val updatedCamera = CameraPosition.Builder(currentCamera)
@@ -579,6 +633,7 @@ class KidNativeMapController(
             .build()
         map.moveCamera(CameraUpdateFactory.newCameraPosition(updatedCamera))
         lastAppliedBearingDegrees = normalizedDesired
+        lastOrientationCommitAtMillis = now
         refitZoomForCurrentBearing(map, mission)
     }
 
@@ -623,19 +678,16 @@ class KidNativeMapController(
         return delta
     }
 
-    private fun maximizeZoomForVisibleRoute(
+    private fun maximizeZoomForVisibleEndpoints(
         map: MapLibreMap,
-        routePoints: List<LatLng>,
+        routeStart: LatLng,
+        missionTarget: LatLng,
         width: Int,
         height: Int,
         topPadding: Int,
         bottomPadding: Int,
         sidePadding: Int,
     ) {
-        if (routePoints.size < 2) {
-            return
-        }
-
         val left = sidePadding.toFloat()
         val top = topPadding.toFloat()
         val right = (width - sidePadding).toFloat()
@@ -654,13 +706,17 @@ class KidNativeMapController(
                 .build()
             map.moveCamera(CameraUpdateFactory.newCameraPosition(candidateCamera))
 
-            val fits = routePoints.all { point ->
-                val screenPoint = map.projection.toScreenLocation(point)
-                screenPoint.x >= left + safetyInset &&
-                    screenPoint.x <= right - safetyInset &&
-                    screenPoint.y >= top + safetyInset &&
-                    screenPoint.y <= bottom - safetyInset
-            }
+            val originPoint = map.projection.toScreenLocation(routeStart)
+            val targetPoint = map.projection.toScreenLocation(missionTarget)
+            val fits =
+                originPoint.x >= left + safetyInset &&
+                    originPoint.x <= right - safetyInset &&
+                    originPoint.y >= top + safetyInset &&
+                    originPoint.y <= bottom - safetyInset &&
+                    targetPoint.x >= left + safetyInset &&
+                    targetPoint.x <= right - safetyInset &&
+                    targetPoint.y >= top + safetyInset &&
+                    targetPoint.y <= bottom - safetyInset
 
             if (!fits) {
                 map.moveCamera(CameraUpdateFactory.newCameraPosition(currentCamera))
@@ -683,51 +739,14 @@ class KidNativeMapController(
             displayedRouteStart = it
         }
         val missionTarget = LatLng(mission.target.latitude, mission.target.longitude)
-        val routePoints = buildRouteLatLngs(mission, routeStart, missionTarget)
-        if (routePoints.size < 2) {
-            return
-        }
-
+        val livePlayer = resolveLiveRouteStart(mission)
         val sidePadding = (width * 0.10f).toInt().coerceAtLeast(40)
         val topPadding = ((viewportTopInsetPx ?: (height * 0.37f)) + (height * 0.02f)).toInt()
         val bottomPadding = ((viewportBottomInsetPx ?: (height * 0.14f)) + (height * 0.04f)).toInt()
-        val left = sidePadding.toFloat()
-        val top = topPadding.toFloat()
-        val right = (width - sidePadding).toFloat()
-        val bottom = (height - bottomPadding).toFloat()
-        val safetyInset = 12f
-
-        repeat(14) {
-            val currentCamera = map.cameraPosition
-            val fits = routePoints.all { point ->
-                val screenPoint = map.projection.toScreenLocation(point)
-                screenPoint.x >= left + safetyInset &&
-                    screenPoint.x <= right - safetyInset &&
-                    screenPoint.y >= top + safetyInset &&
-                    screenPoint.y <= bottom - safetyInset
-            }
-            if (fits) {
-                return@repeat
-            }
-            val zoomedOut = CameraPosition.Builder(currentCamera)
-                .zoom((currentCamera.zoom - 0.26).coerceAtLeast(9.5))
-                .build()
-            map.moveCamera(CameraUpdateFactory.newCameraPosition(zoomedOut))
-        }
-
-        maximizeZoomForVisibleRoute(
-            map = map,
-            routePoints = routePoints,
-            width = width,
-            height = height,
-            topPadding = topPadding,
-            bottomPadding = bottomPadding,
-            sidePadding = sidePadding,
-        )
 
         alignEndpointsToZones(
             map = map,
-            routeStart = routeStart,
+            routeStart = livePlayer ?: routeStart,
             missionTarget = missionTarget,
             width = width,
             height = height,
@@ -749,8 +768,7 @@ class KidNativeMapController(
     ) {
         val availableHeight = (height - topPadding - bottomPadding).coerceAtLeast(1)
         val targetCenterY = topPadding + (availableHeight * 0.02f)
-        val originCenterY = (height - bottomPadding - 28f).coerceAtLeast(targetCenterY + 120f)
-        val desiredMidY = (targetCenterY + originCenterY) / 2f
+        val originCenterY = (height - bottomPadding - 10f).coerceAtLeast(targetCenterY + 120f)
         val desiredSeparation = (originCenterY - targetCenterY).coerceAtLeast(1f)
         val left = sidePadding.toFloat()
         val top = topPadding.toFloat()
@@ -758,7 +776,7 @@ class KidNativeMapController(
         val bottom = (height - bottomPadding).toFloat()
         val safetyInset = 20f
 
-        repeat(8) {
+        repeat(12) {
             val currentCamera = map.cameraPosition
             val originPoint = map.projection.toScreenLocation(routeStart)
             val targetPoint = map.projection.toScreenLocation(missionTarget)
@@ -774,12 +792,13 @@ class KidNativeMapController(
 
             val postZoomOrigin = map.projection.toScreenLocation(routeStart)
             val postZoomTarget = map.projection.toScreenLocation(missionTarget)
-            val postZoomMidY = (postZoomOrigin.y + postZoomTarget.y) / 2f
-            val deltaMidY = desiredMidY - postZoomMidY
+            val desiredOriginX = width / 2f
+            val deltaOriginX = desiredOriginX - postZoomOrigin.x
+            val deltaOriginY = originCenterY - postZoomOrigin.y
             val anchorX = width / 2f
             val anchorY = (top + bottom) / 2f
             val shiftedTarget = map.projection.fromScreenLocation(
-                PointF(anchorX, anchorY - deltaMidY),
+                PointF(anchorX - deltaOriginX, anchorY - deltaOriginY),
             )
             val shiftedCamera = CameraPosition.Builder(map.cameraPosition)
                 .target(shiftedTarget)
@@ -900,4 +919,10 @@ class KidNativeMapController(
             )
         }.toString()
     }
+
+    private data class ActiveRouteState(
+        val routeStart: LatLng,
+        val playerPoint: LatLng,
+        val remainingWaypoints: List<com.cachekid.companion.host.mission.MissionWaypoint>,
+    )
 }

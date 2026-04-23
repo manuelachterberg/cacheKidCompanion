@@ -189,8 +189,10 @@
 
     if (typeof dialBearing === "number") {
       ui.kidCompassDialRotor.style.transform = `rotate(${-dialBearing}deg) scale(1.02)`;
+      ui.kidCompassDialRotor.style.setProperty("--dial-bearing", `${dialBearing}deg`);
     } else {
       ui.kidCompassDialRotor.style.transform = "rotate(0deg) scale(1.02)";
+      ui.kidCompassDialRotor.style.setProperty("--dial-bearing", "0deg");
     }
 
     if (hasStableHeading) {
