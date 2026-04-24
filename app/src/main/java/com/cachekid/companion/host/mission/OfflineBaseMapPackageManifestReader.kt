@@ -1,8 +1,10 @@
 package com.cachekid.companion.host.mission
 
+import java.io.File
+
 class OfflineBaseMapPackageManifestReader {
 
-    fun read(metadata: String, fallbackId: String): OfflineBaseMapPackage? {
+    fun read(metadata: String, fallbackId: String, packageDirectory: File): OfflineBaseMapPackage? {
         val packageId = readPackageId(metadata, fallbackId) ?: return null
         val format = OfflineBaseMapPackageFormat.fromMetadataValue(extractStringValue(metadata, "format"))
             ?: return null
@@ -23,6 +25,7 @@ class OfflineBaseMapPackageManifestReader {
                 ?: MissionPackageSchema.OFFLINE_MAP_PMTILES_FILE,
             styleAssetPath = extractStringValue(metadata, "styleAssetPath")
                 ?: MissionPackageSchema.OFFLINE_MAP_STYLE_FILE,
+            packageDirectory = packageDirectory,
             minZoom = extractIntValue(metadata, "minZoom") ?: 0,
             maxZoom = extractIntValue(metadata, "maxZoom") ?: 14,
             attribution = extractStringValue(metadata, "attribution"),

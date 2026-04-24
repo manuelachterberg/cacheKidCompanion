@@ -2,7 +2,6 @@ package com.cachekid.companion.kid
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -14,14 +13,12 @@ import android.util.Log
 import android.view.View
 import android.widget.FrameLayout
 import com.cachekid.companion.host.mission.ActiveMission
-import org.json.JSONArray
-import org.json.JSONObject
+import com.cachekid.companion.host.mission.OfflineBaseMapPackage
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
-import org.maplibre.android.geometry.LatLngQuad
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.PropertyFactory.lineCap
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
@@ -33,17 +30,10 @@ import org.maplibre.android.style.layers.PropertyFactory.iconSize
 import org.maplibre.android.style.layers.PropertyFactory.lineJoin
 import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
-import org.maplibre.android.style.layers.PropertyFactory.rasterBrightnessMax
-import org.maplibre.android.style.layers.PropertyFactory.rasterBrightnessMin
-import org.maplibre.android.style.layers.PropertyFactory.rasterContrast
-import org.maplibre.android.style.layers.PropertyFactory.rasterOpacity
-import org.maplibre.android.style.layers.PropertyFactory.rasterSaturation
 import org.maplibre.android.style.layers.Property.LINE_CAP_ROUND
 import org.maplibre.android.style.layers.Property.LINE_JOIN_ROUND
-import org.maplibre.android.style.layers.RasterLayer
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
-import org.maplibre.android.style.sources.ImageSource
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
@@ -52,15 +42,15 @@ import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
-import java.util.Base64
+import java.io.File
 
 class KidNativeMapController(
     context: Context,
     private val mapContainer: FrameLayout,
 ) {
     private companion object {
-        const val BASEMAP_SOURCE_ID = "cachekid-basemap-source"
-        const val BASEMAP_LAYER_ID = "cachekid-basemap-layer"
+        const val OFFLINE_BASEMAP_SOURCE_ID = "cachekid-offline-basemap-source"
+        const val OFFLINE_BASEMAP_LAYER_ID = "cachekid-offline-basemap-layer"
         const val TARGET_SOURCE_ID = "cachekid-target-source"
         const val PLAYER_SOURCE_ID = "cachekid-player-source"
         const val ROUTE_SOURCE_ID = "cachekid-route-source"
@@ -96,7 +86,7 @@ class KidNativeMapController(
     private var lastOrientationCommitAtMillis: Long = 0L
     private var displayedMissionId: String? = null
     private var displayedRouteStart: LatLng? = null
-    private var displayedBaseMapKey: String? = null
+    private var displayedStyleKey: String? = null
     private var lastCameraDebugInfo: CameraDebugInfo? = null
     private var viewportTopInsetPx: Float? = null
     private var viewportBottomInsetPx: Float? = null
@@ -131,13 +121,7 @@ class KidNativeMapController(
                 isRotateGesturesEnabled = false
                 isTiltGesturesEnabled = false
             }
-            map.setStyle(Style.Builder().fromJson(buildRasterStyleJson())) {
-                ensureMissionOverlayLayers(it)
-                mapStyleLoaded = true
-                Log.d(CAMERA_LOG_TAG, "style-ready mission=${currentMission?.missionId ?: "--"}")
-                updateMissionOverlays()
-                updateCamera()
-            }
+            applyStyleForMission(map, currentMission)
         }
     }
 
@@ -170,7 +154,7 @@ class KidNativeMapController(
             lastOrientationCommitAtMillis = 0L
             displayedMissionId = null
             displayedRouteStart = null
-            displayedBaseMapKey = null
+            displayedStyleKey = null
             previousCourseLocation = null
             currentCourseBearingDegrees = null
         } else if (missionChanged || displayedMissionId != mission.missionId || displayedRouteStart == null) {
@@ -178,13 +162,16 @@ class KidNativeMapController(
             lastOrientationCommitAtMillis = 0L
             displayedMissionId = mission.missionId
             displayedRouteStart = resolveDisplayRouteStart(mission)
-            displayedBaseMapKey = null
             previousCourseLocation = null
             currentCourseBearingDegrees = null
             lastZoneFitUsedStrict = true
         }
         mapContainer.visibility = if (mission != null) View.VISIBLE else View.GONE
-        updateMissionOverlays()
+        if (missionChanged || mission == null) {
+            applyStyleForMission(mapLibreMap ?: return, mission)
+        } else {
+            updateMissionOverlays()
+        }
         if (missionChanged || mission == null) {
             updateCamera(animate = false)
         }
@@ -315,7 +302,6 @@ class KidNativeMapController(
         val map = mapLibreMap ?: return
         val mission = currentMission ?: return
         val style = map.style ?: return
-        ensureBaseMapLayer(style, mission)
 
         val targetSource = style.getSourceAs<GeoJsonSource>(TARGET_SOURCE_ID) ?: return
         val playerSource = style.getSourceAs<GeoJsonSource>(PLAYER_SOURCE_ID) ?: return
@@ -426,83 +412,46 @@ class KidNativeMapController(
         }
     }
 
-    private fun ensureBaseMapLayer(style: Style, mission: ActiveMission) {
-        val baseMap = mission.baseMap ?: mission.offlineMap ?: run {
-            if (style.getLayer(BASEMAP_LAYER_ID) != null) {
-                style.removeLayer(BASEMAP_LAYER_ID)
-            }
-            if (style.getSource(BASEMAP_SOURCE_ID) != null) {
-                style.removeSource(BASEMAP_SOURCE_ID)
-            }
-            displayedBaseMapKey = null
-            return
-        }
-        val basemapBitmap = bitmapFromMissionMap(baseMap) ?: run {
-            Log.w(CAMERA_LOG_TAG, "basemap decode failed mission=${mission.missionId} asset=${baseMap.assetPath}")
-            if (style.getLayer(BASEMAP_LAYER_ID) != null) {
-                style.removeLayer(BASEMAP_LAYER_ID)
-            }
-            if (style.getSource(BASEMAP_SOURCE_ID) != null) {
-                style.removeSource(BASEMAP_SOURCE_ID)
-            }
-            displayedBaseMapKey = null
-            return
-        }
-        val baseMapKey = listOf(
-            mission.missionId,
-            baseMap.assetPath,
-            baseMap.bounds.minLatitude,
-            baseMap.bounds.minLongitude,
-            baseMap.bounds.maxLatitude,
-            baseMap.bounds.maxLongitude,
-        ).joinToString("|")
-        if (displayedBaseMapKey == baseMapKey && style.getSource(BASEMAP_SOURCE_ID) != null) {
+    private fun applyStyleForMission(map: MapLibreMap, mission: ActiveMission?) {
+        val styleKey = buildStyleKey(mission)
+        if (styleKey == displayedStyleKey && mapStyleLoaded) {
+            updateMissionOverlays()
             return
         }
 
-        val baseMapQuad = LatLngQuad(
-            LatLng(baseMap.bounds.maxLatitude, baseMap.bounds.minLongitude),
-            LatLng(baseMap.bounds.maxLatitude, baseMap.bounds.maxLongitude),
-            LatLng(baseMap.bounds.minLatitude, baseMap.bounds.maxLongitude),
-            LatLng(baseMap.bounds.minLatitude, baseMap.bounds.minLongitude),
-        )
-        val existingSource = style.getSourceAs<ImageSource>(BASEMAP_SOURCE_ID)
-        if (existingSource == null) {
-            style.addSource(ImageSource(BASEMAP_SOURCE_ID, baseMapQuad, basemapBitmap))
-        } else {
-            existingSource.setCoordinates(baseMapQuad)
-            existingSource.setImage(basemapBitmap)
+        mapStyleLoaded = false
+        displayedStyleKey = styleKey
+        map.setStyle(Style.Builder().fromJson(buildStyleJsonForMission(mission))) {
+            ensureMissionOverlayLayers(it)
+            mapStyleLoaded = true
+            Log.d(CAMERA_LOG_TAG, "style-ready mission=${currentMission?.missionId ?: "--"} style=$styleKey")
+            updateMissionOverlays()
+            updateCamera()
         }
-        if (style.getLayer(BASEMAP_LAYER_ID) == null) {
-            style.addLayerAt(
-                RasterLayer(BASEMAP_LAYER_ID, BASEMAP_SOURCE_ID).withProperties(
-                    rasterSaturation(-1f),
-                    rasterContrast(0.08f),
-                    rasterBrightnessMin(0.28f),
-                    rasterBrightnessMax(1.02f),
-                    rasterOpacity(0.96f),
-                ),
-                2,
-            )
-        }
-        displayedBaseMapKey = baseMapKey
-        Log.d(
-            CAMERA_LOG_TAG,
-            "basemap-ready mission=${mission.missionId} asset=${baseMap.assetPath} bounds=${baseMap.bounds.minLatitude},${baseMap.bounds.minLongitude}|${baseMap.bounds.maxLatitude},${baseMap.bounds.maxLongitude}",
-        )
     }
 
-    private fun bitmapFromMissionMap(map: com.cachekid.companion.host.mission.MissionOfflineMap): Bitmap? {
-        if (map.assetPath.endsWith(".png", ignoreCase = true)) {
-            val base64Payload = Regex("""data:image/png;base64,([A-Za-z0-9+/=]+)""")
-                .find(map.svgContent)
-                ?.groupValues
-                ?.getOrNull(1)
-                ?: return null
-            val pngBytes = runCatching { Base64.getDecoder().decode(base64Payload) }.getOrNull() ?: return null
-            return BitmapFactory.decodeByteArray(pngBytes, 0, pngBytes.size)
+    private fun buildStyleKey(mission: ActiveMission?): String {
+        val offlinePackage = mission?.offlineBaseMapPackage
+        return if (offlinePackage != null) {
+            listOf(
+                "offline",
+                offlinePackage.id,
+                offlinePackage.version,
+                offlinePackage.tileAssetPath,
+                offlinePackage.styleAssetPath,
+            ).joinToString("|")
+        } else {
+            "missing-offline-map"
         }
-        return null
+    }
+
+    private fun buildStyleJsonForMission(mission: ActiveMission?): String {
+        val offlinePackage = mission?.offlineBaseMapPackage
+        return if (offlinePackage != null) {
+            buildOfflinePackageStyleJson(offlinePackage)
+        } else {
+            buildMissingOfflineMapStyleJson()
+        }
     }
 
     private fun buildTargetFeatures(targetPoint: Point): List<Feature> {
@@ -1188,62 +1137,72 @@ class KidNativeMapController(
         return result[0].toDouble()
     }
 
-    private fun buildRasterStyleJson(): String {
-        return JSONObject().apply {
-            put("version", 8)
-            put("name", "CacheKid Native Kid Map")
-            put(
-                "sources",
-                JSONObject().apply {
-                    put(
-                        "osm-raster",
-                        JSONObject().apply {
-                            put("type", "raster")
-                            put(
-                                "tiles",
-                                JSONArray().put("https://tile.openstreetmap.org/{z}/{x}/{y}.png"),
-                            )
-                            put("tileSize", 256)
-                            put("minzoom", 0)
-                            put("maxzoom", 19)
-                        },
-                    )
+    private fun buildMissingOfflineMapStyleJson(): String {
+        return """
+            {
+              "version": 8,
+              "name": "CacheKid Missing Offline Map",
+              "sources": {},
+              "layers": [
+                {
+                  "id": "background",
+                  "type": "background",
+                  "paint": {
+                    "background-color": "#f4f2ea"
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+    }
+
+    private fun buildOfflinePackageStyleJson(offlinePackage: OfflineBaseMapPackage): String {
+        val tileUrl = "pmtiles://file://${offlinePackage.packageDirectory.absolutePath}/${offlinePackage.tileAssetPath}"
+        val styleFile = File(offlinePackage.packageDirectory, offlinePackage.styleAssetPath)
+        val packageStyle = runCatching { styleFile.readText() }.getOrNull()
+        if (!packageStyle.isNullOrBlank()) {
+            return packageStyle
+                .replace("\${CACHEKID_PMTILES_URL}", tileUrl)
+                .replace("CACHEKID_PMTILES_URL", tileUrl)
+                .replace("pmtiles://cachekid-local-map", tileUrl)
+        }
+
+        return """
+            {
+              "version": 8,
+              "name": "CacheKid Offline ${escapeJson(offlinePackage.id)}",
+              "sources": {
+                "$OFFLINE_BASEMAP_SOURCE_ID": {
+                  "type": "vector",
+                  "url": "${escapeJson(tileUrl)}",
+                  "minzoom": ${offlinePackage.minZoom},
+                  "maxzoom": ${offlinePackage.maxZoom}
+                }
+              },
+              "layers": [
+                {
+                  "id": "background",
+                  "type": "background",
+                  "paint": {
+                    "background-color": "#f4f2ea"
+                  }
                 },
-            )
-            put(
-                "layers",
-                JSONArray()
-                    .put(
-                        JSONObject().apply {
-                            put("id", "background")
-                            put("type", "background")
-                            put(
-                                "paint",
-                                JSONObject().apply {
-                                    put("background-color", "#f4f2ea")
-                                },
-                            )
-                        },
-                    )
-                    .put(
-                        JSONObject().apply {
-                            put("id", "osm-raster")
-                            put("type", "raster")
-                            put("source", "osm-raster")
-                            put(
-                                "paint",
-                                JSONObject().apply {
-                                    put("raster-saturation", -1)
-                                    put("raster-contrast", 0.08)
-                                    put("raster-brightness-min", 0.28)
-                                    put("raster-brightness-max", 1.02)
-                                    put("raster-opacity", 0.93)
-                                },
-                            )
-                        },
-                    ),
-            )
-        }.toString()
+                {
+                  "id": "$OFFLINE_BASEMAP_LAYER_ID",
+                  "type": "background",
+                  "paint": {
+                    "background-color": "#e1dfd6"
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+    }
+
+    private fun escapeJson(value: String): String {
+        return value
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
     }
 
     private data class ActiveRouteState(

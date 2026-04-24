@@ -1220,6 +1220,13 @@ class MainActivity : AppCompatActivity() {
     private fun attachDeviceBaseMap(mission: ActiveMission): ActiveMission {
         return mission.copy(
             baseMap = deviceOfflineBaseMapRepository.loadFor(mission.target),
+            offlineBaseMapPackage = offlineBaseMapPackageRepository().findCovering(mission.target),
+        )
+    }
+
+    private fun offlineBaseMapPackageRepository(): com.cachekid.companion.host.mission.OfflineBaseMapPackageRepository {
+        return com.cachekid.companion.host.mission.OfflineBaseMapPackageRepository(
+            File(filesDir, OFFLINE_BASEMAP_DIRECTORY),
         )
     }
 
@@ -1354,11 +1361,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun describeBaseMapStatus(mission: ActiveMission?): String {
         val currentMission = mission ?: return "Lokale Basemap: keine aktive Mission."
-        val baseMap = currentMission.baseMap
-        return if (baseMap != null) {
-            "Lokale Basemap gefunden."
+        val offlinePackage = currentMission.offlineBaseMapPackage
+        return if (offlinePackage != null) {
+            "Offline-Karte gefunden: ${offlinePackage.displayName}."
         } else {
-            "Keine lokale Basemap gefunden."
+            "Keine echte Offline-Karte fuer dieses Ziel gefunden."
         }
     }
 

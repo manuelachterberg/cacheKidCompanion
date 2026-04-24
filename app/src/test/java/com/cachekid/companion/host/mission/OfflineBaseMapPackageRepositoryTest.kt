@@ -46,6 +46,7 @@ class OfflineBaseMapPackageRepositoryTest {
         assertEquals(OfflineBaseMapPackageFormat.PMTILES_VECTOR, offlinePackage?.format)
         assertEquals("map.pmtiles", offlinePackage?.tileAssetPath)
         assertEquals("style.json", offlinePackage?.styleAssetPath)
+        assertEquals("lower-saxony", offlinePackage?.packageDirectory?.name)
         assertEquals(14, offlinePackage?.maxZoom)
     }
 

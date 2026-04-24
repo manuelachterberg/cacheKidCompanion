@@ -12,4 +12,5 @@ data class ActiveMission(
     val sourceApp: String? = null,
     val offlineMap: MissionOfflineMap? = null,
     val baseMap: MissionOfflineMap? = null,
+    val offlineBaseMapPackage: OfflineBaseMapPackage? = null,
 )

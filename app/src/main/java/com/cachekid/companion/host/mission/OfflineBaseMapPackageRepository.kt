@@ -31,7 +31,7 @@ class OfflineBaseMapPackageRepository(
 
         val packageId = manifestReader.readPackageId(metadata, fallbackId = packageDirectory.name)
             ?: return null
-        val offlinePackage = manifestReader.read(metadata, packageId) ?: return null
+        val offlinePackage = manifestReader.read(metadata, packageId, packageDirectory) ?: return null
 
         if (
             !File(packageDirectory, offlinePackage.tileAssetPath).isFile ||

@@ -1,5 +1,7 @@
 package com.cachekid.companion.host.mission
 
+import java.io.File
+
 data class OfflineBaseMapPackage(
     val id: String,
     val displayName: String,
@@ -8,6 +10,7 @@ data class OfflineBaseMapPackage(
     val bounds: MissionMapBounds,
     val tileAssetPath: String,
     val styleAssetPath: String,
+    val packageDirectory: File,
     val minZoom: Int,
     val maxZoom: Int,
     val attribution: String?,

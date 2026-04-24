@@ -28,7 +28,8 @@ class OfflineBaseMapPackageZipInstaller(
                 packageDirectory = null,
                 errors = listOf("Offline map package id is missing or invalid."),
             )
-        val offlinePackage = manifestReader.read(metadata, fallbackId = packageId)
+        val packageDirectory = File(baseDirectory, packageId)
+        val offlinePackage = manifestReader.read(metadata, fallbackId = packageId, packageDirectory = packageDirectory)
             ?: return OfflineBaseMapPackageInstallResult(
                 offlinePackage = null,
                 packageDirectory = null,
@@ -60,7 +61,6 @@ class OfflineBaseMapPackageZipInstaller(
             )
         }
 
-        val packageDirectory = File(baseDirectory, packageId)
         val temporaryDirectory = File(baseDirectory, "$packageId.tmp").apply {
             deleteRecursively()
         }

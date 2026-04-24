@@ -45,6 +45,11 @@ offline-maps/<package-id>/
 ```
 
 The initial supported format is `pmtiles-vector`. This matches the current MapLibre Android dependency line, which supports PMTiles URL protocols in recent 11.x releases. The package must include a local `style.json` that references the local PMTiles archive and keeps the kid presentation label-light or label-free.
+The app replaces one of these placeholders in `style.json` with the installed local PMTiles URL:
+
+- `${CACHEKID_PMTILES_URL}`
+- `CACHEKID_PMTILES_URL`
+- `pmtiles://cachekid-local-map`
 
 ## Runtime Rules
 
