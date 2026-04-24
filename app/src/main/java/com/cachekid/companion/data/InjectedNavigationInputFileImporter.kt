@@ -1,7 +1,6 @@
 package com.cachekid.companion.data
 
 import java.io.File
-import org.json.JSONObject
 
 class InjectedNavigationInputFileImporter(
     private val clock: () -> Long = System::currentTimeMillis,
@@ -72,12 +71,11 @@ class InjectedNavigationInputFileImporter(
     }
 
     private fun parse(jsonText: String): InjectedNavigationInput {
-        val json = JSONObject(jsonText)
-        val latitude = json.takeIf { it.has("latitude") }?.optDouble("latitude")
-        val longitude = json.takeIf { it.has("longitude") }?.optDouble("longitude")
-        val accuracyMeters = json.takeIf { it.has("accuracyMeters") }?.optDouble("accuracyMeters")?.toFloat()
-        val headingDegrees = json.takeIf { it.has("headingDegrees") }?.optDouble("headingDegrees")?.toFloat()
-        val capturedAtEpochMillis = json.optLong("capturedAtEpochMillis", clock())
+        val latitude = extractDouble(jsonText, "latitude")
+        val longitude = extractDouble(jsonText, "longitude")
+        val accuracyMeters = extractDouble(jsonText, "accuracyMeters")?.toFloat()
+        val headingDegrees = extractDouble(jsonText, "headingDegrees")?.toFloat()
+        val capturedAtEpochMillis = extractLong(jsonText, "capturedAtEpochMillis") ?: clock()
 
         if (latitude != null && longitude == null || latitude == null && longitude != null) {
             error("latitude und longitude muessen gemeinsam geliefert werden.")
@@ -93,6 +91,26 @@ class InjectedNavigationInputFileImporter(
             headingDegrees = headingDegrees,
             capturedAtEpochMillis = capturedAtEpochMillis,
         )
+    }
+
+    private fun extractDouble(jsonText: String, fieldName: String): Double? {
+        return NUMBER_FIELD_REGEX_TEMPLATE
+            .format(Regex.escape(fieldName))
+            .toRegex()
+            .find(jsonText)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toDoubleOrNull()
+    }
+
+    private fun extractLong(jsonText: String, fieldName: String): Long? {
+        return NUMBER_FIELD_REGEX_TEMPLATE
+            .format(Regex.escape(fieldName))
+            .toRegex()
+            .find(jsonText)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toLongOrNull()
     }
 
     private fun archive(sourceFile: File, archiveDirectoryName: String): File? {
@@ -139,6 +157,8 @@ class InjectedNavigationInputFileImporter(
     companion object {
         const val IMPORTED_DIRECTORY_NAME = "imported"
         const val FAILED_DIRECTORY_NAME = "failed"
+        private const val NUMBER_FIELD_REGEX_TEMPLATE =
+            """"%s"\s*:\s*(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)"""
     }
 }
 
