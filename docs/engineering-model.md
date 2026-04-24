@@ -251,6 +251,14 @@ The intended offline map architecture is:
 
 Mission-specific generated map assets may exist as prototype code paths, but they should not become hidden architectural defaults.
 
+The current target package format is a device-local PMTiles package:
+
+- `offline-map.json` manifest
+- `map.pmtiles` tile archive
+- `style.json` local MapLibre style
+
+Legacy `map.png` / `map.svg` basemap assets are prototype fallbacks only. They must remain distinct from real offline map packages so the app can show an explicit missing-map state instead of implying that a full offline map is available.
+
 ## 16. Kid device input rule
 
 The kid runtime must support both:

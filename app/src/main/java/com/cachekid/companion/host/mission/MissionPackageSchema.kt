@@ -8,6 +8,9 @@ object MissionPackageSchema {
     const val MAP_METADATA_FILE = "map-meta.json"
     const val MAP_SVG_FILE = "map.svg"
     const val MAP_PNG_FILE = "map.png"
+    const val OFFLINE_MAP_METADATA_FILE = "offline-map.json"
+    const val OFFLINE_MAP_PMTILES_FILE = "map.pmtiles"
+    const val OFFLINE_MAP_STYLE_FILE = "style.json"
 
     val requiredCoreFiles: List<String> = listOf(
         INTEGRITY_FILE,

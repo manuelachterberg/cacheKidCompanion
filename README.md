@@ -169,6 +169,10 @@ The intended map architecture is:
 
 Mission-specific generated map assets may still exist as prototype or fallback code, but they are not the long-term architecture.
 
+The concrete offline-map target is documented in `docs/offline-map-architecture.md`.
+Real kid-device offline maps are installed packages containing `offline-map.json`, `map.pmtiles`, and `style.json`.
+Bundled `map.png` / `map.svg` basemaps are legacy prototype assets and must not be treated as proof that the device has a real offline map installed.
+
 ### Kid map presentation
 
 The child map should stay:
