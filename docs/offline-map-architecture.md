@@ -53,6 +53,18 @@ The initial supported format is `pmtiles-vector`. This matches the current MapLi
 - A mission target outside all installed package bounds is a missing-map state. The runtime must not silently choose the nearest unrelated map package.
 - Online OSM raster tiles are a development fallback only and should not be the production kid-map default.
 
+## Installation Path
+
+The on-device storage root is the app-private offline map directory:
+
+```text
+files/offline-basemaps/<package-id>/
+```
+
+The development sideload path accepts zip files containing `offline-map.json`, `map.pmtiles`, and `style.json`.
+The installer validates the manifest and required files before replacing an existing package directory.
+Imported source zips are archived into `imported/`; failed imports are archived into `failed/` with an error report.
+
 ## Follow-Up Work
 
 - #26 installs and validates offline map packages on-device.

@@ -50,6 +50,8 @@ import com.cachekid.companion.host.mission.HostMissionBuilderPresenter
 import com.cachekid.companion.host.mission.MissionOfflineMapService
 import com.cachekid.companion.host.mission.MissionTarget
 import com.cachekid.companion.host.mission.OfflineMissionMapComposer
+import com.cachekid.companion.host.mission.OfflineBaseMapPackageSideloadImporter
+import com.cachekid.companion.host.mission.OfflineBaseMapPackageSideloadStatus
 import com.cachekid.companion.host.mission.WalkingRouteWaypointService
 import com.cachekid.companion.host.resolution.CacheResolutionResult
 import com.cachekid.companion.host.resolution.AndroidGeocachingSessionStore
@@ -81,6 +83,7 @@ class MainActivity : AppCompatActivity() {
     private val missionPackageWriter = MissionPackageWriter()
     private val missionPackageFileStore = MissionPackageFileStore()
     private val missionPackageSideloadImporter = MissionPackageSideloadImporter()
+    private val offlineBaseMapPackageSideloadImporter = OfflineBaseMapPackageSideloadImporter()
     private val injectedNavigationInputImporter = InjectedNavigationInputFileImporter()
     private val missionPackageSenderClient = MissionPackageSenderClient()
     private val missionTargetParser = MissionTargetParser()
@@ -103,6 +106,7 @@ class MainActivity : AppCompatActivity() {
     private var sideloadStatusText: String = "Kein adb-Sideload importiert."
     private var navigationInputStatusText: String = "Keine adb-Navigation importiert."
     private var sideloadImportRunning: Boolean = false
+    private var offlineBaseMapImportRunning: Boolean = false
     private var navigationInputImportRunning: Boolean = false
     private var importSessionId: Long = 0L
     private var latestLocation: Location? = null
@@ -296,6 +300,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        importPendingOfflineBaseMap(showToast = false)
         activeMission = loadActiveMission()
         importPendingSideloadMission(showToast = activeMission == null)
         importPendingInjectedNavigationInput(showToast = false)
@@ -320,6 +325,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         kidNativeMapController.onResume()
+        importPendingOfflineBaseMap(showToast = false)
         importPendingSideloadMission(showToast = activeMission == null)
         importPendingInjectedNavigationInput(showToast = activeMission != null)
         if (hasLocationPermissions()) {
@@ -1013,6 +1019,69 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun importPendingOfflineBaseMap(showToast: Boolean) {
+        if (offlineBaseMapImportRunning) {
+            return
+        }
+        offlineBaseMapImportRunning = true
+        lifecycleScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    offlineBaseMapPackageSideloadImporter.importLatest(
+                        offlineMapBaseDirectory = File(filesDir, OFFLINE_BASEMAP_DIRECTORY),
+                        candidateDirectories = offlineBaseMapSideloadDirectories(),
+                    )
+                }
+
+                when (result.status) {
+                    OfflineBaseMapPackageSideloadStatus.NO_PACKAGE_FOUND -> Unit
+
+                    OfflineBaseMapPackageSideloadStatus.IMPORTED -> {
+                        deviceOfflineBaseMapRepository = DeviceOfflineBaseMapRepository(
+                            File(filesDir, OFFLINE_BASEMAP_DIRECTORY),
+                        )
+                        activeMission = activeMission?.let(::attachDeviceBaseMap)
+                        refreshNativeMap()
+                        Log.d(
+                            RESOLVER_LOG_TAG,
+                            "offline-basemap-imported source=${result.sourceFile?.absolutePath} archived=${result.archivedFile?.absolutePath} package=${result.installResult?.offlinePackage?.id}",
+                        )
+                        if (showToast) {
+                            Toast.makeText(
+                                this@MainActivity,
+                                result.message,
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    }
+
+                    OfflineBaseMapPackageSideloadStatus.IMPORT_FAILED -> {
+                        Log.w(
+                            RESOLVER_LOG_TAG,
+                            "offline-basemap-import-failed source=${result.sourceFile?.absolutePath} archived=${result.archivedFile?.absolutePath} errors=${result.errors.joinToString(" | ")}",
+                        )
+                        if (showToast) {
+                            Toast.makeText(
+                                this@MainActivity,
+                                result.message,
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        }
+                    }
+                }
+            } finally {
+                offlineBaseMapImportRunning = false
+            }
+        }
+    }
+
+    private fun offlineBaseMapSideloadDirectories(): List<File> {
+        val internalDirectory = File(filesDir, OFFLINE_MAP_SIDELOAD_DIRECTORY).apply { mkdirs() }
+        val externalDirectory = getExternalFilesDir(null)
+            ?.let { File(it, OFFLINE_MAP_SIDELOAD_DIRECTORY).apply { mkdirs() } }
+        return listOfNotNull(externalDirectory, internalDirectory)
+    }
+
     private fun sideloadDirectories(): List<File> {
         val internalDirectory = File(filesDir, MISSION_SIDELOAD_DIRECTORY).apply { mkdirs() }
         val externalDirectory = getExternalFilesDir(null)
@@ -1299,6 +1368,7 @@ class MainActivity : AppCompatActivity() {
         const val MISSION_STORAGE_DIRECTORY = "missions"
         const val MISSION_SIDELOAD_DIRECTORY = "mission-sideload"
         const val NAVIGATION_INPUT_SIDELOAD_DIRECTORY = "navigation-input-sideload"
+        const val OFFLINE_MAP_SIDELOAD_DIRECTORY = "offline-map-sideload"
         const val OFFLINE_BASEMAP_DIRECTORY = "offline-basemaps"
         const val DEFAULT_RECEIVER_HOST = "127.0.0.1"
         const val DEFAULT_RECEIVER_PORT = 8765
