@@ -36,6 +36,8 @@ import com.cachekid.companion.host.mission.DeviceOfflineBaseMapRepository
 import com.cachekid.companion.host.mission.MissionDraft
 import com.cachekid.companion.host.mission.MissionPackageFileStore
 import com.cachekid.companion.host.mission.MissionPackageReceiverServer
+import com.cachekid.companion.host.mission.MissionPackageSideloadImporter
+import com.cachekid.companion.host.mission.MissionPackageSideloadStatus
 import com.cachekid.companion.host.mission.MissionPackageSendResult
 import com.cachekid.companion.host.mission.MissionPackageSenderClient
 import com.cachekid.companion.host.mission.MissionPackageStoreResult
@@ -75,6 +77,7 @@ class MainActivity : AppCompatActivity() {
     private val missionDraftFactory = MissionDraftFactory()
     private val missionPackageWriter = MissionPackageWriter()
     private val missionPackageFileStore = MissionPackageFileStore()
+    private val missionPackageSideloadImporter = MissionPackageSideloadImporter()
     private val missionPackageSenderClient = MissionPackageSenderClient()
     private val missionTargetParser = MissionTargetParser()
     private val hostMissionBuilderPresenter = HostMissionBuilderPresenter(missionTargetParser)
@@ -93,6 +96,8 @@ class MainActivity : AppCompatActivity() {
     private var receiveServer: MissionPackageReceiverServer? = null
     private var receiveServerRunning: Boolean = false
     private var receiveStatusText: String = "Empfang aus."
+    private var sideloadStatusText: String = "Kein adb-Sideload importiert."
+    private var sideloadImportRunning: Boolean = false
     private var importSessionId: Long = 0L
     private var latestLocation: Location? = null
     private lateinit var deviceOfflineBaseMapRepository: DeviceOfflineBaseMapRepository
@@ -255,6 +260,9 @@ class MainActivity : AppCompatActivity() {
         binding.nativeReceiveToggleButton.setOnClickListener {
             toggleReceiveMode()
         }
+        binding.nativeSideloadImportButton.setOnClickListener {
+            importPendingSideloadMission(showToast = true)
+        }
         binding.nativeSendMissionButton.setOnClickListener {
             lifecycleScope.launch {
                 val result = withContext(Dispatchers.IO) {
@@ -273,6 +281,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         activeMission = loadActiveMission()
+        importPendingSideloadMission(showToast = activeMission == null)
         handleShareIntent(intent)
         refreshNativeImportPanel()
         refreshReceivePanel()
@@ -293,6 +302,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         kidNativeMapController.onResume()
+        importPendingSideloadMission(showToast = activeMission == null)
         if (hasLocationPermissions()) {
             nativeBridge.startNativeSensors()
         }
@@ -602,6 +612,9 @@ class MainActivity : AppCompatActivity() {
 
         binding.nativeReceivePanel.visibility = View.VISIBLE
         binding.nativeReceiveStatus.text = receiveStatusText
+        binding.nativeSideloadHint.text =
+            "ADB-Sideload: ZIP nach ${preferredSideloadDirectory().absolutePath} pushen."
+        binding.nativeSideloadStatus.text = sideloadStatusText
         binding.nativeReceiveToggleButton.text = if (receiveServerRunning) {
             "Empfang stoppen"
         } else {
@@ -897,6 +910,93 @@ class MainActivity : AppCompatActivity() {
             ?.let(::attachDeviceBaseMap)
     }
 
+    private fun importPendingSideloadMission(showToast: Boolean) {
+        if (sideloadImportRunning) {
+            return
+        }
+        sideloadImportRunning = true
+        lifecycleScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    missionPackageSideloadImporter.importLatest(
+                        missionBaseDirectory = File(filesDir, MISSION_STORAGE_DIRECTORY),
+                        candidateDirectories = sideloadDirectories(),
+                    )
+                }
+
+                when (result.status) {
+                    MissionPackageSideloadStatus.NO_PACKAGE_FOUND -> {
+                        sideloadStatusText = result.message
+                        refreshReceivePanel()
+                    }
+
+                    MissionPackageSideloadStatus.IMPORTED -> {
+                        activeMission = loadActiveMission()
+                        sideloadStatusText = buildString {
+                            append(result.message)
+                            result.archivedFile?.let {
+                                append(" Archiv: ")
+                                append(it.absolutePath)
+                            }
+                        }
+                        Log.d(
+                            RESOLVER_LOG_TAG,
+                            "sideload-imported source=${result.sourceFile?.absolutePath} archived=${result.archivedFile?.absolutePath} mission=${result.importResult?.missionId}",
+                        )
+                        refreshNativeImportPanel()
+                        refreshReceivePanel()
+                        refreshNativeMap()
+                        if (::nativeBridge.isInitialized) {
+                            nativeBridge.notifyActiveMissionUpdated()
+                        }
+                        if (showToast) {
+                            Toast.makeText(
+                                this@MainActivity,
+                                result.message,
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    }
+
+                    MissionPackageSideloadStatus.IMPORT_FAILED -> {
+                        sideloadStatusText = buildString {
+                            append(result.message)
+                            result.errors.firstOrNull()?.let {
+                                append(" ")
+                                append(it)
+                            }
+                        }
+                        Log.w(
+                            RESOLVER_LOG_TAG,
+                            "sideload-import-failed source=${result.sourceFile?.absolutePath} archived=${result.archivedFile?.absolutePath} errors=${result.errors.joinToString(" | ")}",
+                        )
+                        refreshReceivePanel()
+                        if (showToast) {
+                            Toast.makeText(
+                                this@MainActivity,
+                                sideloadStatusText,
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        }
+                    }
+                }
+            } finally {
+                sideloadImportRunning = false
+            }
+        }
+    }
+
+    private fun sideloadDirectories(): List<File> {
+        val internalDirectory = File(filesDir, MISSION_SIDELOAD_DIRECTORY).apply { mkdirs() }
+        val externalDirectory = getExternalFilesDir(null)
+            ?.let { File(it, MISSION_SIDELOAD_DIRECTORY).apply { mkdirs() } }
+        return listOfNotNull(externalDirectory, internalDirectory)
+    }
+
+    private fun preferredSideloadDirectory(): File {
+        return sideloadDirectories().first()
+    }
+
     private fun attachDeviceBaseMap(mission: ActiveMission): ActiveMission {
         return mission.copy(
             baseMap = deviceOfflineBaseMapRepository.loadFor(mission.target),
@@ -1033,6 +1133,7 @@ class MainActivity : AppCompatActivity() {
         const val RESOLVER_LOG_TAG = "CacheKidResolver"
         const val DEFAULT_TARGET_TEXT = ""
         const val MISSION_STORAGE_DIRECTORY = "missions"
+        const val MISSION_SIDELOAD_DIRECTORY = "mission-sideload"
         const val OFFLINE_BASEMAP_DIRECTORY = "offline-basemaps"
         const val DEFAULT_RECEIVER_HOST = "127.0.0.1"
         const val DEFAULT_RECEIVER_PORT = 8765

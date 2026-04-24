@@ -120,4 +120,33 @@ class DeviceOfflineBaseMapRepositoryTest {
         assertNotNull(map)
         assertEquals("map.png", map?.assetPath)
     }
+
+    @Test
+    fun `repository prefers png asset even when metadata points to svg`() {
+        val baseDirectory = createTempDirectory("cachekid-offline-basemap-prefer-png").toFile()
+        val mapDirectory = File(baseDirectory, "celle").apply { mkdirs() }
+        File(mapDirectory, MissionPackageSchema.MAP_PNG_FILE).writeBytes(byteArrayOf(1, 2, 3, 4))
+        File(mapDirectory, MissionPackageSchema.MAP_SVG_FILE).writeText("<svg><path d=\"M 0 0 L 10 10\" /></svg>")
+        File(mapDirectory, MissionPackageSchema.MAP_METADATA_FILE).writeText(
+            """
+                {
+                  "assetPath": "map.svg",
+                  "bounds": {
+                    "minLatitude": 52.60,
+                    "minLongitude": 10.04,
+                    "maxLatitude": 52.65,
+                    "maxLongitude": 10.11
+                  }
+                }
+            """.trimIndent(),
+        )
+
+        val repository = DeviceOfflineBaseMapRepository(baseDirectory)
+
+        val map = repository.loadFor(MissionTarget(52.617, 10.0543))
+
+        assertNotNull(map)
+        assertEquals("map.png", map?.assetPath)
+        assertTrue(map?.svgContent?.contains("data:image/png;base64") == true)
+    }
 }
