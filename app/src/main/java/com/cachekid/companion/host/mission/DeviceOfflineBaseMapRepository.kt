@@ -30,7 +30,10 @@ class DeviceOfflineBaseMapRepository(
             ?.readText()
             ?: return null
 
-        val assetPath = extractStringValue(metaJson, "assetPath") ?: MissionPackageSchema.MAP_SVG_FILE
+        val assetPath = selectPreferredAssetPath(
+            mapDirectory = mapDirectory,
+            configuredAssetPath = extractStringValue(metaJson, "assetPath"),
+        ) ?: return null
         val boundsJson = extractObject(metaJson, "bounds") ?: return null
         val svgContent = File(mapDirectory, assetPath)
             .takeIf { it.exists() && it.isFile }
@@ -54,6 +57,30 @@ class DeviceOfflineBaseMapRepository(
             wrapPngAsSvgSnippet(assetFile.readBytes(), assetPath)
         } else {
             unwrapSvgDocument(assetFile.readText())
+        }
+    }
+
+    private fun selectPreferredAssetPath(
+        mapDirectory: File,
+        configuredAssetPath: String?,
+    ): String? {
+        val pngFile = File(mapDirectory, MissionPackageSchema.MAP_PNG_FILE)
+        if (pngFile.exists() && pngFile.isFile) {
+            return MissionPackageSchema.MAP_PNG_FILE
+        }
+
+        val configuredFile = configuredAssetPath
+            ?.let { File(mapDirectory, it) }
+            ?.takeIf { it.exists() && it.isFile }
+        if (configuredFile != null) {
+            return configuredFile.name
+        }
+
+        val svgFile = File(mapDirectory, MissionPackageSchema.MAP_SVG_FILE)
+        return if (svgFile.exists() && svgFile.isFile) {
+            MissionPackageSchema.MAP_SVG_FILE
+        } else {
+            null
         }
     }
 
