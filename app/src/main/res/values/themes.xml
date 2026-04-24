@@ -1,10 +1,4 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <style name="Theme.CacheKidCompanion.Launch" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/splash_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
-        <item name="postSplashScreenTheme">@style/Theme.CacheKidCompanion</item>
-    </style>
-
     <style name="Theme.CacheKidCompanion" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/black</item>
         <item name="colorPrimaryVariant">@color/black</item>

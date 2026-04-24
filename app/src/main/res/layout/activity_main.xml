@@ -5,25 +5,6 @@
     android:background="@android:color/white">
 
     <FrameLayout
-        android:id="@+id/launchSplashOverlay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@color/splash_background"
-        android:clickable="true"
-        android:focusable="true"
-        android:elevation="24dp">
-
-        <ImageView
-            android:id="@+id/launchSplashLogo"
-            android:layout_width="280dp"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:adjustViewBounds="true"
-            android:contentDescription="@string/app_name"
-            android:src="@drawable/cachekid_splash_logo" />
-    </FrameLayout>
-
-    <FrameLayout
         android:id="@+id/nativeKidMapContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

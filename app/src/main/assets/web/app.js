@@ -13,7 +13,6 @@
     mapBearingDegrees: null,
     location: null,
     bearingDegrees: null,
-    arrowDegrees: 0,
     sourceLabel: "Browser",
     watchId: null,
     hasNativeHost: typeof window.AndroidHost !== "undefined",
@@ -48,7 +47,6 @@
     missionCacheCode: document.getElementById("missionCacheCode"),
     missionTargetLabel: document.getElementById("missionTargetLabel"),
     missionHint: document.getElementById("missionHint"),
-    arrow: document.getElementById("arrow"),
     distanceValue: document.getElementById("distanceValue"),
     headingValue: document.getElementById("headingValue"),
     bearingValue: document.getElementById("bearingValue"),
@@ -109,11 +107,6 @@
       ui.headingValue.textContent = `${Math.round(state.headingDegrees)}°`;
     } else {
       ui.headingValue.textContent = "--";
-    }
-
-    if (typeof state.headingDegrees === "number" && typeof state.bearingDegrees === "number") {
-      state.arrowDegrees = calculateArrowDegrees(state.headingDegrees, state.bearingDegrees);
-      ui.arrow.style.transform = `rotate(${state.arrowDegrees}deg)`;
     }
 
     ui.sourceValue.textContent = state.sourceLabel;

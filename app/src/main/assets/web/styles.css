@@ -426,7 +426,7 @@ h1 {
   color: var(--muted);
 }
 
-.arrow-wrap {
+.idle-logo-wrap {
   aspect-ratio: 1;
   width: min(72vw, 360px);
   margin: 0 auto 18px;
@@ -439,15 +439,11 @@ h1 {
   place-items: center;
 }
 
-.arrow {
-  width: 0;
-  height: 0;
-  border-left: 34px solid transparent;
-  border-right: 34px solid transparent;
-  border-bottom: 150px solid var(--ink);
-  transform-origin: center 78px;
-  transition: transform 120ms linear;
-  filter: drop-shadow(0 6px 0 rgba(107, 122, 64, 0.2));
+.idle-logo {
+  width: min(58vw, 240px);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 18px rgba(107, 122, 64, 0.18));
 }
 
 .stats-grid,

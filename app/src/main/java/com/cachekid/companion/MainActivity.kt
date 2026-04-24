@@ -7,7 +7,6 @@ import android.location.Location
 import android.util.Log
 import android.os.Build
 import android.os.Bundle
-import android.os.SystemClock
 import android.view.View
 import android.widget.Toast
 import android.widget.FrameLayout
@@ -19,8 +18,9 @@ import android.webkit.WebViewClient
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.cachekid.companion.config.PermissionRequirements
 import com.cachekid.companion.databinding.ActivityMainBinding
 import com.cachekid.companion.data.HybridSensorRepository
@@ -93,8 +93,6 @@ class MainActivity : AppCompatActivity() {
     private var receiveServer: MissionPackageReceiverServer? = null
     private var receiveServerRunning: Boolean = false
     private var receiveStatusText: String = "Empfang aus."
-    private var launchStartedAtMillis: Long = 0L
-    private var launchSplashDismissed: Boolean = false
     private var importSessionId: Long = 0L
     private var latestLocation: Location? = null
     private lateinit var deviceOfflineBaseMapRepository: DeviceOfflineBaseMapRepository
@@ -138,8 +136,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
-        launchStartedAtMillis = SystemClock.elapsedRealtime()
         super.onCreate(savedInstanceState)
         MapLibre.getInstance(applicationContext)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -355,11 +351,7 @@ class MainActivity : AppCompatActivity() {
         webView.isVerticalScrollBarEnabled = false
         webView.isHorizontalScrollBarEnabled = false
         webView.addJavascriptInterface(nativeBridge, "AndroidHost")
-        webView.webViewClient = object : WebViewClient() {
-            override fun onPageCommitVisible(view: WebView?, url: String?) {
-                dismissLaunchSplashWhenReady()
-            }
-        }
+        webView.webViewClient = object : WebViewClient() {}
         webView.webChromeClient = object : WebChromeClient() {
             override fun onGeolocationPermissionsShowPrompt(
                 origin: String?,
@@ -368,28 +360,6 @@ class MainActivity : AppCompatActivity() {
                 callback?.invoke(origin, hasLocationPermissions(), false)
             }
         }
-    }
-
-    private fun dismissLaunchSplashWhenReady() {
-        if (launchSplashDismissed) {
-            return
-        }
-
-        val elapsed = SystemClock.elapsedRealtime() - launchStartedAtMillis
-        val remaining = (MIN_LAUNCH_SPLASH_DURATION_MS - elapsed).coerceAtLeast(0L)
-        binding.launchSplashOverlay.postDelayed({
-            if (launchSplashDismissed) {
-                return@postDelayed
-            }
-            launchSplashDismissed = true
-            binding.launchSplashOverlay.animate()
-                .alpha(0f)
-                .setDuration(LAUNCH_SPLASH_FADE_DURATION_MS)
-                .withEndAction {
-                    binding.launchSplashOverlay.visibility = View.GONE
-                }
-                .start()
-        }, remaining)
     }
 
     private fun hasLocationPermissions(): Boolean {
@@ -1004,11 +974,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun observeNativeLocationForMap() {
         lifecycleScope.launch {
-            sensorRepository.locationUpdates.collectLatest { location ->
-                latestLocation = location
-                if (activeMission != null) {
-                    kidNativeMapController.updateLocation(location)
-                    syncNativeMapOrientation()
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                sensorRepository.locationUpdates.collectLatest { location ->
+                    latestLocation = location
+                    if (activeMission != null) {
+                        kidNativeMapController.updateLocation(location)
+                        syncNativeMapOrientation()
+                    }
                 }
             }
         }
@@ -1016,10 +988,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun observeNativeHeadingForMap() {
         lifecycleScope.launch {
-            sensorRepository.headingDegrees.collectLatest { heading ->
-                if (activeMission != null) {
-                    kidNativeMapController.updateHeading(heading)
-                    syncNativeMapOrientation()
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                sensorRepository.headingDegrees.collectLatest { heading ->
+                    if (activeMission != null) {
+                        kidNativeMapController.updateHeading(heading)
+                        syncNativeMapOrientation()
+                    }
                 }
             }
         }
@@ -1062,7 +1036,5 @@ class MainActivity : AppCompatActivity() {
         const val OFFLINE_BASEMAP_DIRECTORY = "offline-basemaps"
         const val DEFAULT_RECEIVER_HOST = "127.0.0.1"
         const val DEFAULT_RECEIVER_PORT = 8765
-        const val MIN_LAUNCH_SPLASH_DURATION_MS = 900L
-        const val LAUNCH_SPLASH_FADE_DURATION_MS = 220L
     }
 }
