@@ -111,30 +111,31 @@ class NativeBridge(
             emitEvent(
                 type = "native-status",
                 payload = JSONObject().apply {
-                    put("status", "Standortberechtigung fehlt. Bitte zuerst freigeben.")
+                    put("status", "Standortberechtigung fehlt. Onboard-GPS ist aus, externe Navigation kann weiter genutzt werden.")
                 },
             )
-            return
         }
 
         if (headingJob == null) {
             headingJob = coroutineScope.launch {
-                sensorRepository.headingDegrees.collectLatest { heading ->
-                    emitEvent(
-                        type = "heading",
-                        payload = JSONObject().apply {
-                            put("headingDegrees", heading.toDouble())
-                            put("source", "android-rotation-vector")
-                        },
-                    )
+                sensorRepository.headingReadings.collectLatest { reading ->
+                    if (reading != null) {
+                        emitEvent(
+                            type = "heading",
+                            payload = JSONObject().apply {
+                                put("headingDegrees", reading.headingDegrees.toDouble())
+                                put("source", reading.source.name.lowercase())
+                            },
+                        )
+                    }
                 }
             }
         }
 
         if (locationJob == null) {
             locationJob = coroutineScope.launch {
-                sensorRepository.locationUpdates.collectLatest { location ->
-                    location?.let { emitLocationEvent(it) }
+                sensorRepository.locationReadings.collectLatest { reading ->
+                    reading?.let { emitLocationEvent(it.location, it.source.name.lowercase()) }
                 }
             }
         }
@@ -188,14 +189,14 @@ class NativeBridge(
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun emitLocationEvent(location: Location) {
+    private fun emitLocationEvent(location: Location, source: String) {
         emitEvent(
             type = "location",
             payload = JSONObject().apply {
                 put("latitude", location.latitude)
                 put("longitude", location.longitude)
                 put("accuracyMeters", location.accuracy.toDouble())
-                put("source", location.provider ?: "android")
+                put("source", source)
             },
         )
     }
