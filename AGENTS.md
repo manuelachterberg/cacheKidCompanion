@@ -31,6 +31,8 @@ See `docs/engineering-model.md` for the repository operating model that those st
 ## Planning and issue hygiene
 
 - Every non-trivial change should map to a GitHub issue.
+- Treat GitHub issue state, PR state, and GitHub Project board state as one combined source of truth when reporting or assessing work status.
+- When checking status, do not stop at `OPEN` / `CLOSED`; also verify whether the related item is in `Todo`, `In Progress`, or `Done` on the active project board.
 - If implementation reveals missing work, create a follow-up issue before merging.
 - Do not leave implicit TODOs in code as the only record of deferred work.
 - If a task grows beyond its original scope, split the remaining work into new issues instead of silently expanding the change.
@@ -80,4 +82,4 @@ See `docs/engineering-model.md` for the repository operating model that those st
 - No silent fallbacks that hide failure modes.
 - No large unstructured files that mix domain logic, UI orchestration, and integration glue.
 - No testless feature work unless the limitation is explicit and documented.
-- No direct pushes to `main`.
+- No direct pushes to `main` unless the user explicitly requests a direct `main` update for a small repository-process or documentation rule change.
