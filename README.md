@@ -62,7 +62,7 @@ The intended split is:
   - local mission storage
   - offline map rendering against a device-local offline map base
   - route / waypoint / `X` overlays
-  - GPS / heading / BLE sensor integration
+  - navigation input integration for both devices with onboard sensors and devices without them
   - child-facing mission UI
 
 The bridge contract remains intentionally capability-driven. The WebView UI can still fall back to browser features when `window.AndroidHost` is absent, but the Meebook kid app is the primary Android runtime.
@@ -88,7 +88,7 @@ CacheKid Kid App on Meebook
         |
         | store mission locally
         | render route, treasure target, and local offline base map
-        | use on-device GPS / heading
+        | use either local sensors or externally supplied navigation inputs
         v
 Offline kid navigation experience
 ```
@@ -125,8 +125,33 @@ local transfer receiver
   -> local offline map base
   -> route / waypoint / X overlays
   -> kid-facing navigation UI
-  -> GPS / heading providers
+  -> navigation input providers
 ```
+
+### Device sensor classes
+
+The kid runtime must support both of these device classes:
+
+- devices with onboard navigation sensors
+  - local GPS
+  - local compass / heading
+- devices without onboard navigation sensors
+  - location and heading must be supplied externally
+  - the source may be BLE, paired host data, or another bridge path
+
+That means the kid app cannot assume that the Meebook itself always owns GPS and compass hardware.
+
+The architecture should therefore separate:
+
+- mission playback and map rendering
+- navigation state ingestion
+- sensor-source selection and degraded-state UX
+
+The kid-facing UI should stay the same regardless of whether the inputs come from:
+
+- on-device sensors
+- an external sensor
+- or a host-fed transport path
 
 ### Offline map direction
 
@@ -166,6 +191,14 @@ The intended map camera style is:
 
 The BLE path is Meebook-side and not sensor-specific yet.
 
+BLE is only one possible solution for devices without onboard sensors.
+
+The broader rule is:
+
+- when the device has working onboard GPS / heading, use them
+- when the device does not, the app still needs a supported external input path
+- the source-selection seam should stay explicit in architecture and UX
+
 You need to replace the placeholder UUIDs in:
 
 - `app/src/main/java/com/cachekid/companion/data/BleSensorConfig.kt`
@@ -195,9 +228,10 @@ Recommended next implementation steps:
 
 1. Stop treating Android-host map generation as the primary path.
 2. Recut the kid map around a device-local offline map base on the Meebook.
-3. Keep mission packages focused on overlays, route, target, and mission metadata.
-4. Define the real iPhone host responsibilities and transfer contract explicitly.
-5. Continue simplifying the child-only mission view.
+3. Define the supported navigation-input paths for both sensor-rich and sensor-poor kid devices.
+4. Keep mission packages focused on overlays, route, target, and mission metadata.
+5. Define the real iPhone host responsibilities and transfer contract explicitly.
+6. Continue simplifying the child-only mission view.
 
 ## Engineering workflow
 

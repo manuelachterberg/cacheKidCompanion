@@ -251,7 +251,23 @@ The intended offline map architecture is:
 
 Mission-specific generated map assets may exist as prototype code paths, but they should not become hidden architectural defaults.
 
-## 16. Kid map camera rule
+## 16. Kid device input rule
+
+The kid runtime must support both:
+
+- devices with onboard GPS / heading hardware
+- devices without onboard GPS / heading hardware
+
+That means:
+
+- map playback and mission UX must not be tightly coupled to one specific sensor source
+- navigation state ingestion needs an explicit seam
+- source selection must allow local-device inputs and external-device inputs
+- degraded or missing-input states must be represented explicitly in the UI
+
+BLE is one possible external-input path, but not the only allowed architecture.
+
+## 17. Kid map camera rule
 
 The child map should allow a subtle 3D tilt only when it remains e-ink-safe.
 

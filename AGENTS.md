@@ -59,6 +59,8 @@ See `docs/engineering-model.md` for the repository operating model that those st
 - `main` is protected and should only be updated through pull requests.
 - Do not bypass review, required checks, or conversation resolution.
 - Assume branch protection is intentional and design work to fit inside it.
+- On non-`main` branches, pushed commits are the default expectation once the user asks for a commit, PR, or CI-visible update.
+- Do not leave requested work stranded only in the local checkout unless the user explicitly asks to keep it local.
 
 ## Pull request expectations
 
