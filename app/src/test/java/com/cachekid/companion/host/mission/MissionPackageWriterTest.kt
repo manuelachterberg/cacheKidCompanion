@@ -27,6 +27,28 @@ class MissionPackageWriterTest {
     }
 
     @Test
+    fun `writer includes optional offline map files when present`() {
+        val result = writer.write(
+            validDraft().copy(
+                offlineMap = MissionOfflineMap(
+                    svgContent = "<path d=\"M 0 0 L 10 10\" />",
+                    bounds = MissionMapBounds(
+                        minLatitude = 52.5,
+                        minLongitude = 13.3,
+                        maxLatitude = 52.6,
+                        maxLongitude = 13.5,
+                    ),
+                ),
+            ),
+        )
+
+        val missionPackage = requireNotNull(result.missionPackage)
+
+        assertTrue(missionPackage.files.any { it.path == MissionPackageSchema.MAP_SVG_FILE })
+        assertTrue(missionPackage.files.any { it.path == MissionPackageSchema.MAP_METADATA_FILE })
+    }
+
+    @Test
     fun `writer includes integrity checksum for mission json`() {
         val result = writer.write(validDraft())
 
@@ -39,6 +61,28 @@ class MissionPackageWriterTest {
         assertTrue(integrityFile!!.content.contains("\"algorithm\": \"sha256\""))
         assertTrue(integrityFile.content.contains("missionJsonSha256"))
         assertTrue(missionFile!!.content.contains("\"missionId\": \"gc12345-der-schatz-im-wald\""))
+    }
+
+    @Test
+    fun `writer includes optional waypoints in mission json`() {
+        val result = writer.write(
+            validDraft().copy(
+                routeOrigin = MissionTarget(52.5200, 13.4040),
+                waypoints = listOf(
+                    MissionWaypoint(52.5205, 13.4050, "Start"),
+                    MissionWaypoint(52.5210, 13.4060, "Ecke"),
+                ),
+            ),
+        )
+
+        val missionFile = requireNotNull(result.missionPackage)
+            .files
+            .first { it.path == "mission.json" }
+
+        assertTrue(missionFile.content.contains(""""routeOrigin""""))
+        assertTrue(missionFile.content.contains(""""waypoints""""))
+        assertTrue(missionFile.content.contains(""""label": "Start""""))
+        assertTrue(missionFile.content.contains(""""latitude": 52.521"""))
     }
 
     @Test

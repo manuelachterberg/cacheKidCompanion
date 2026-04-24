@@ -1,33 +1,59 @@
-import {
-  calculateArrowDegrees,
-  calculateBearing,
-  calculateDistanceMeters,
-  normalizeDegrees,
-  parseTarget,
-} from "./navigation.js";
-
 (function () {
+  const {
+    calculateArrowDegrees,
+    calculateBearing,
+    calculateDistanceMeters,
+    normalizeDegrees,
+    parseTarget,
+  } = window.CacheKidNavigation;
+
   const state = {
     target: { latitude: 52.520008, longitude: 13.404954 },
     headingDegrees: null,
+    mapBearingDegrees: null,
     location: null,
     bearingDegrees: null,
-    arrowDegrees: 0,
     sourceLabel: "Browser",
     watchId: null,
     hasNativeHost: typeof window.AndroidHost !== "undefined",
     pendingMissionDraft: null,
     pendingResolution: null,
+    activeMission: null,
+    missionRuntime: {
+      missionId: null,
+      startDistanceMeters: null,
+    },
     importStatus: null,
     shareDebug: null,
   };
 
   const ui = {
-    arrow: document.getElementById("arrow"),
+    kidMissionView: document.getElementById("kidMissionView"),
+    kidDistanceValue: document.getElementById("kidDistanceValue"),
+    kidDistanceScaleFill: document.getElementById("kidDistanceScaleFill"),
+    kidHeadingDebug: document.getElementById("kidHeadingDebug"),
+    kidCompassDialRotor: document.getElementById("kidCompassDialRotor"),
+    kidCompassDial: document.getElementById("kidCompassDial"),
+    kidCompassNeedle: document.getElementById("kidCompassNeedle"),
+    kidMapTerrain: document.getElementById("kidMapTerrain"),
+    kidMapRouteGlow: document.getElementById("kidMapRouteGlow"),
+    kidMapRoute: document.getElementById("kidMapRoute"),
+    kidMapTargetMarker: document.getElementById("kidMapTargetMarker"),
+    appEyebrow: document.getElementById("appEyebrow"),
+    appTitle: document.getElementById("appTitle"),
+    missionOverviewCard: document.getElementById("missionOverviewCard"),
+    missionTitle: document.getElementById("missionTitle"),
+    missionSummary: document.getElementById("missionSummary"),
+    missionCacheCode: document.getElementById("missionCacheCode"),
+    missionTargetLabel: document.getElementById("missionTargetLabel"),
+    missionHint: document.getElementById("missionHint"),
     distanceValue: document.getElementById("distanceValue"),
     headingValue: document.getElementById("headingValue"),
     bearingValue: document.getElementById("bearingValue"),
     sourceValue: document.getElementById("sourceValue"),
+    headingCard: document.getElementById("headingCard"),
+    bearingCard: document.getElementById("bearingCard"),
+    sourceCard: document.getElementById("sourceCard"),
     locationValue: document.getElementById("locationValue"),
     resolutionPanel: document.getElementById("resolutionPanel"),
     resolutionMessage: document.getElementById("resolutionMessage"),
@@ -60,6 +86,7 @@ import {
   }
 
   function render() {
+    renderActiveMission();
     renderImportStatus();
     renderPendingResolution();
     renderPendingMissionDraft();
@@ -82,12 +109,146 @@ import {
       ui.headingValue.textContent = "--";
     }
 
-    if (typeof state.headingDegrees === "number" && typeof state.bearingDegrees === "number") {
-      state.arrowDegrees = calculateArrowDegrees(state.headingDegrees, state.bearingDegrees);
-      ui.arrow.style.transform = `rotate(${state.arrowDegrees}deg)`;
+    ui.sourceValue.textContent = state.sourceLabel;
+    renderKidMissionView();
+  }
+
+  function renderActiveMission() {
+    const hasActiveMission = Boolean(state.activeMission);
+    document.body.classList.toggle("kid-mode", hasActiveMission && state.hasNativeHost);
+    document.body.classList.toggle("native-map-mode", hasActiveMission && state.hasNativeHost);
+
+    if (!hasActiveMission) {
+      ui.missionOverviewCard.hidden = true;
+      ui.appEyebrow.textContent = "Hybrid Navigator";
+      ui.appTitle.textContent = "CacheKid Companion";
+      return;
     }
 
-    ui.sourceValue.textContent = state.sourceLabel;
+    ui.missionOverviewCard.hidden = false;
+    ui.missionTitle.textContent = state.activeMission.childTitle;
+    ui.missionSummary.textContent = state.activeMission.summary;
+    ui.missionCacheCode.textContent = state.activeMission.cacheCode;
+    ui.missionTargetLabel.textContent = `${state.activeMission.target.latitude.toFixed(5)}, ${state.activeMission.target.longitude.toFixed(5)}`;
+    ui.missionHint.textContent = "Folge dem Pfeil. Wenn die Distanz kleiner wird, kommst du naeher an den Schatz.";
+    ui.appEyebrow.textContent = "Schatzkarte";
+    ui.appTitle.textContent = state.activeMission.childTitle;
+  }
+
+  function renderKidMissionView() {
+    const hasKidMission = Boolean(state.activeMission && state.hasNativeHost);
+    ui.kidMissionView.hidden = !hasKidMission;
+    if (!hasKidMission) {
+      return;
+    }
+
+    if (state.missionRuntime.missionId !== state.activeMission.missionId) {
+      state.missionRuntime = {
+        missionId: state.activeMission.missionId,
+        startDistanceMeters: null,
+      };
+    }
+
+    let distanceMeters = null;
+    if (state.location) {
+      distanceMeters = calculateDistanceMeters(state.location, state.target);
+      if (state.missionRuntime.startDistanceMeters == null) {
+        state.missionRuntime.startDistanceMeters = distanceMeters;
+      }
+    }
+
+    renderKidCompass(distanceMeters);
+    renderKidMap(distanceMeters);
+  }
+
+  function renderKidCompass(distanceMeters) {
+    if (typeof distanceMeters === "number") {
+      ui.kidDistanceValue.textContent = `${Math.round(distanceMeters)} m`;
+      const startDistance = state.missionRuntime.startDistanceMeters || distanceMeters;
+      const progress = startDistance > 0
+        ? Math.max(0, Math.min(1, 1 - (distanceMeters / startDistance)))
+        : 0;
+      ui.kidDistanceScaleFill.style.width = `${Math.max(6, Math.round(progress * 100))}%`;
+    } else {
+      ui.kidDistanceValue.textContent = "--";
+      ui.kidDistanceScaleFill.style.width = "0%";
+    }
+
+    const dialBearing = typeof state.mapBearingDegrees === "number"
+      ? state.mapBearingDegrees
+      : state.headingDegrees;
+    const hasStableHeading = typeof dialBearing === "number" && typeof state.bearingDegrees === "number";
+    ui.kidCompassNeedle.hidden = !hasStableHeading;
+
+    if (typeof dialBearing === "number") {
+      ui.kidCompassDialRotor.style.transform = `rotate(${-dialBearing}deg) scale(1.02)`;
+      ui.kidCompassDialRotor.style.setProperty("--dial-bearing", `${dialBearing}deg`);
+    } else {
+      ui.kidCompassDialRotor.style.transform = "rotate(0deg) scale(1.02)";
+      ui.kidCompassDialRotor.style.setProperty("--dial-bearing", "0deg");
+    }
+
+    if (hasStableHeading) {
+      const arrowDegrees = calculateArrowDegrees(dialBearing, state.bearingDegrees);
+      ui.kidCompassNeedle.style.transform = `rotate(${arrowDegrees}deg)`;
+    }
+  }
+
+  function renderKidMap(distanceMeters) {
+    const relativeAngle = typeof state.headingDegrees === "number" && typeof state.bearingDegrees === "number"
+      ? calculateArrowDegrees(state.headingDegrees, state.bearingDegrees)
+      : typeof state.bearingDegrees === "number"
+        ? state.bearingDegrees
+        : 0;
+
+    const playerX = 50;
+    const playerY = 104;
+    const routeReach = distanceMeters == null
+      ? 38
+      : Math.max(24, Math.min(54, 26 + Math.log10(distanceMeters + 10) * 10));
+    const angleRadians = (relativeAngle * Math.PI) / 180;
+    const targetX = clamp(playerX + Math.sin(angleRadians) * (routeReach * 0.72), 18, 82);
+    const targetY = clamp(playerY - Math.cos(angleRadians) * routeReach, 22, 116);
+    const bendX = playerX + Math.sin(angleRadians) * 8 + Math.cos(angleRadians) * 7;
+    const bendY = playerY - routeReach * 0.48;
+
+    const routePath = [
+      `M ${playerX} ${playerY}`,
+      `Q ${bendX.toFixed(2)} ${bendY.toFixed(2)} ${targetX.toFixed(2)} ${targetY.toFixed(2)}`,
+    ].join(" ");
+
+    ui.kidMapRouteGlow.setAttribute("d", routePath);
+    ui.kidMapRoute.setAttribute("d", routePath);
+
+    const targetScale = distanceMeters == null
+      ? 1
+      : clamp(1 + ((180 - Math.min(distanceMeters, 180)) / 150), 1, 2.15);
+    ui.kidMapTargetMarker.setAttribute(
+      "transform",
+      `translate(${targetX.toFixed(2)} ${targetY.toFixed(2)}) scale(${targetScale.toFixed(2)})`,
+    );
+
+    renderKidTerrain(relativeAngle, targetX, targetY);
+  }
+
+  function renderKidTerrain(relativeAngle, targetX, targetY) {
+    if (state.activeMission && state.hasNativeHost) {
+      ui.kidMapTerrain.innerHTML = "";
+      return;
+    }
+    if (state.activeMission?.baseMap?.svgContent) {
+      ui.kidMapTerrain.innerHTML = state.activeMission.baseMap.svgContent;
+      return;
+    }
+    if (state.activeMission?.offlineMap?.svgContent) {
+      ui.kidMapTerrain.innerHTML = state.activeMission.offlineMap.svgContent;
+      return;
+    }
+    ui.kidMapTerrain.innerHTML = "";
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
   }
 
   function renderImportStatus() {
@@ -249,6 +410,15 @@ import {
       }
     }
 
+    if (typeof window.AndroidHost.getActiveMissionJson === "function") {
+      const rawMission = window.AndroidHost.getActiveMissionJson();
+      if (rawMission) {
+        state.activeMission = JSON.parse(rawMission);
+        state.target = state.activeMission.target;
+        ui.targetInput.value = `${state.target.latitude},${state.target.longitude}`;
+      }
+    }
+
     if (typeof window.AndroidHost.getPendingResolutionJson === "function") {
       const rawResolution = window.AndroidHost.getPendingResolutionJson();
       if (rawResolution) {
@@ -298,6 +468,16 @@ import {
       return;
     }
 
+    if (type === "map-orientation") {
+      state.mapBearingDegrees =
+        typeof payload.mapBearingDegrees === "number" ? payload.mapBearingDegrees : null;
+      if (typeof payload.targetBearingDegrees === "number") {
+        state.bearingDegrees = payload.targetBearingDegrees;
+      }
+      render();
+      return;
+    }
+
     if (type === "ble-status") {
       setStatus(payload.status);
       return;
@@ -310,6 +490,20 @@ import {
 
     if (type === "import-updated") {
       applyPendingImportPayload(payload);
+      return;
+    }
+
+    if (type === "active-mission-updated") {
+      state.activeMission = payload.activeMission || null;
+      state.missionRuntime = {
+        missionId: state.activeMission?.missionId || null,
+        startDistanceMeters: null,
+      };
+      if (state.activeMission?.target) {
+        state.target = state.activeMission.target;
+        ui.targetInput.value = `${state.target.latitude},${state.target.longitude}`;
+      }
+      render();
     }
   }
 

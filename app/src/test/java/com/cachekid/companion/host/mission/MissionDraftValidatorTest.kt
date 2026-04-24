@@ -66,4 +66,30 @@ class MissionDraftValidatorTest {
         assertFalse(result.isValid)
         assertTrue(result.errors.any { it.contains("Target coordinates") })
     }
+
+    @Test
+    fun `invalid waypoint coordinates fail validation`() {
+        val result = validator.validate(
+            MissionDraft(
+                cacheCode = "GC12345",
+                sourceTitle = "Cache",
+                childTitle = "Schatz",
+                summary = "Summary",
+                target = MissionTarget(
+                    latitude = 52.0,
+                    longitude = 13.0,
+                ),
+                waypoints = listOf(
+                    MissionWaypoint(
+                        latitude = 120.0,
+                        longitude = 13.0,
+                        label = "Kaputt",
+                    ),
+                ),
+            ),
+        )
+
+        assertFalse(result.isValid)
+        assertTrue(result.errors.any { it.contains("Waypoint coordinates") })
+    }
 }

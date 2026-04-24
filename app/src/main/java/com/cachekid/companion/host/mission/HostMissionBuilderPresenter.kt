@@ -61,7 +61,10 @@ class HostMissionBuilderPresenter(
             builderHint = builderHint,
             showStoredStatus = storedMissionResult?.isSuccess == true,
             storedStatus = storedMissionResult?.missionDirectory?.name?.let { missionId ->
-                "Gespeichert in: $missionId"
+                listOfNotNull(
+                    "Gespeichert in: $missionId",
+                    storedMissionResult.infoMessage,
+                ).joinToString("\n")
             },
             showSendStatus = sendMissionResult != null,
             sendStatus = sendMissionResult?.message,

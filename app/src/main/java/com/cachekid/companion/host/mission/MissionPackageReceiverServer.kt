@@ -2,6 +2,7 @@ package com.cachekid.companion.host.mission
 
 import java.io.BufferedInputStream
 import java.io.File
+import java.net.BindException
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketException
@@ -14,18 +15,24 @@ class MissionPackageReceiverServer(
     private val importer: MissionPackageZipImporter = MissionPackageZipImporter(),
     private val port: Int = DEFAULT_PORT,
     private val onStatusChanged: (String) -> Unit,
+    private val onMissionImported: (MissionPackageImportResult) -> Unit = {},
 ) {
 
     private val running = AtomicBoolean(false)
     private var executor: ExecutorService? = null
     private var serverSocket: ServerSocket? = null
 
-    fun start(): Int {
+    fun start(): Int? {
         if (running.get()) {
             return serverSocket?.localPort ?: port
         }
 
-        val socket = ServerSocket(port)
+        val socket = try {
+            ServerSocket(port)
+        } catch (error: BindException) {
+            onStatusChanged("Empfang konnte nicht gestartet werden. Port $port ist bereits belegt.")
+            return null
+        }
         executor = Executors.newSingleThreadExecutor()
         serverSocket = socket
         running.set(true)
@@ -89,6 +96,7 @@ class MissionPackageReceiverServer(
         val result = importer.import(baseDirectory, body)
         if (result.isSuccess) {
             onStatusChanged("Mission empfangen: ${result.missionId}")
+            onMissionImported(result)
             writeResponse(output, 200, "Stored ${result.missionId}")
         } else {
             onStatusChanged(result.errors.firstOrNull() ?: "Mission-Empfang fehlgeschlagen.")

@@ -36,7 +36,7 @@ class MissionPackageFileStoreTest {
             manifest = MissionManifest(
                 schemaVersion = MissionPackageSchema.CURRENT_SCHEMA_VERSION,
                 missionId = "gc12345-test",
-                files = MissionPackageSchema.requiredManifestFiles,
+                files = MissionPackageSchema.requiredCoreFiles,
             ),
             files = listOf(
                 MissionPackageFile("mission.json", "{}"),

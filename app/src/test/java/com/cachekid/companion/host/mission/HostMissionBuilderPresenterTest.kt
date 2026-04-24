@@ -25,7 +25,7 @@ class HostMissionBuilderPresenterTest {
             missionDraft = null,
             storedMissionResult = null,
             sendMissionResult = null,
-            defaultTargetText = "52.520008,13.404954",
+            defaultTargetText = "",
         )
 
         assertTrue(state.isVisible)
@@ -33,6 +33,7 @@ class HostMissionBuilderPresenterTest {
         assertTrue(state.showManualResolution)
         assertFalse(state.showMissionBuilder)
         assertEquals("GC7NXFT", state.manualResolutionTitle)
+        assertEquals("", state.manualResolutionTarget)
     }
 
     @Test
@@ -58,7 +59,7 @@ class HostMissionBuilderPresenterTest {
                 errors = emptyList(),
             ),
             sendMissionResult = null,
-            defaultTargetText = "52.520008,13.404954",
+            defaultTargetText = "",
         )
 
         assertEquals("Mission vorbereiten", state.panelTitle)

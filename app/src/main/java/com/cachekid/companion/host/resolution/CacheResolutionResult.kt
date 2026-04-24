@@ -5,4 +5,5 @@ data class CacheResolutionResult(
     val value: ResolvedCacheDetails?,
     val cacheCodeHint: String? = null,
     val messages: List<String>,
+    val debugInfo: String? = null,
 )

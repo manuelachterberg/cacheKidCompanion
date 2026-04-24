@@ -20,18 +20,24 @@ class MissionPackageWriter(
         val missionJson = buildMissionJson(draft, missionId)
         val missionSha256 = sha256Hex(missionJson)
         val integrityJson = buildIntegrityJson(missionSha256)
+        val mapFiles = buildOfflineMapFiles(draft.offlineMap)
         val manifest = MissionManifest(
             schemaVersion = MissionPackageSchema.CURRENT_SCHEMA_VERSION,
             missionId = missionId,
-            files = MissionPackageSchema.requiredManifestFiles,
+            files = (
+                MissionPackageSchema.requiredCoreFiles +
+                    mapFiles.map { it.path }
+                ).sorted(),
         )
         val manifestJson = buildManifestJson(manifest)
 
-        val files = listOf(
-            MissionPackageFile(path = "integrity.json", content = integrityJson),
-            MissionPackageFile(path = "manifest.json", content = manifestJson),
-            MissionPackageFile(path = "mission.json", content = missionJson),
-        ).sortedBy { it.path }
+        val files = (
+            listOf(
+                MissionPackageFile(path = MissionPackageSchema.INTEGRITY_FILE, content = integrityJson),
+                MissionPackageFile(path = MissionPackageSchema.MANIFEST_FILE, content = manifestJson),
+                MissionPackageFile(path = MissionPackageSchema.MISSION_FILE, content = missionJson),
+            ) + mapFiles
+            ).sortedBy { it.path }
 
         return MissionPackageWriteResult(
             missionPackage = MissionPackage(
@@ -56,6 +62,29 @@ class MissionPackageWriter(
 
     private fun buildMissionJson(draft: MissionDraft, missionId: String): String {
         val escapedSourceApp = draft.sourceApp?.let { "\"${escapeJson(it)}\"" } ?: "null"
+        val hasOfflineMapAsset = draft.offlineMap?.svgContent?.isNotBlank() == true
+        val routeOriginJson = draft.routeOrigin?.let { routeOrigin ->
+            """
+              "routeOrigin": {
+                "latitude": ${routeOrigin.latitude},
+                "longitude": ${routeOrigin.longitude}
+              },
+            """.trimIndent()
+        } ?: ""
+        val waypointsJson = if (draft.waypoints.isEmpty()) {
+            ""
+        } else {
+            draft.waypoints.joinToString(",\n", prefix = "  \"waypoints\": [\n", postfix = "\n  ],") { waypoint ->
+                val escapedLabel = waypoint.label?.let { "\"${escapeJson(it)}\"" } ?: "null"
+                """
+                    {
+                      "latitude": ${waypoint.latitude},
+                      "longitude": ${waypoint.longitude},
+                      "label": $escapedLabel
+                    }
+                """.trimIndent().prependIndent("    ")
+            }
+        }
         return """
             {
               "schemaVersion": ${MissionPackageSchema.CURRENT_SCHEMA_VERSION},
@@ -68,7 +97,10 @@ class MissionPackageWriter(
                 "latitude": ${draft.target.latitude},
                 "longitude": ${draft.target.longitude}
               },
-              "sourceApp": $escapedSourceApp
+${routeOriginJson.ifBlank { "" }}
+${waypointsJson.ifBlank { "" }}
+              "sourceApp": $escapedSourceApp,
+              "hasOfflineMap": $hasOfflineMapAsset
             }
         """.trimIndent()
     }
@@ -100,6 +132,35 @@ $filesJson
     private fun sha256Hex(content: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(content.toByteArray(Charsets.UTF_8))
         return digest.joinToString("") { byte -> "%02x".format(byte) }
+    }
+
+    private fun buildOfflineMapFiles(offlineMap: MissionOfflineMap?): List<MissionPackageFile> {
+        if (offlineMap == null || offlineMap.svgContent.isBlank()) {
+            return emptyList()
+        }
+
+        val metaJson = """
+            {
+              "assetPath": "${escapeJson(offlineMap.assetPath)}",
+              "bounds": {
+                "minLatitude": ${offlineMap.bounds.minLatitude},
+                "minLongitude": ${offlineMap.bounds.minLongitude},
+                "maxLatitude": ${offlineMap.bounds.maxLatitude},
+                "maxLongitude": ${offlineMap.bounds.maxLongitude}
+              }
+            }
+        """.trimIndent()
+
+        return listOf(
+            MissionPackageFile(
+                path = MissionPackageSchema.MAP_METADATA_FILE,
+                content = metaJson,
+            ),
+            MissionPackageFile(
+                path = offlineMap.assetPath,
+                content = offlineMap.svgContent,
+            ),
+        )
     }
 
     private fun escapeJson(value: String): String {

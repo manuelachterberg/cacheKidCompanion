@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="CacheKid Companion" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>Ludwig-Hölty</name>
+  </metadata>
+  <wpt lat="52.60807666666667" lon="10.068843333333334"><name>Start</name></wpt>
+  <wpt lat="52.608213" lon="10.068632"><name>Wegpunkt 1</name></wpt>
+  <wpt lat="52.608248" lon="10.067947"><name>Wegpunkt 2</name></wpt>
+  <wpt lat="52.608427" lon="10.06456"><name>Wegpunkt 3</name></wpt>
+  <wpt lat="52.608218" lon="10.064022"><name>Wegpunkt 4</name></wpt>
+  <wpt lat="52.608494" lon="10.063185"><name>Wegpunkt 5</name></wpt>
+  <wpt lat="52.608583" lon="10.061878"><name>Wegpunkt 6</name></wpt>
+  <wpt lat="52.608871" lon="10.059904"><name>Wegpunkt 7</name></wpt>
+  <wpt lat="52.609284" lon="10.060025"><name>Wegpunkt 8</name></wpt>
+  <wpt lat="52.611294" lon="10.061265"><name>Wegpunkt 9</name></wpt>
+  <wpt lat="52.612885" lon="10.061815"><name>Wegpunkt 10</name></wpt>
+  <wpt lat="52.614523" lon="10.062353"><name>Wegpunkt 11</name></wpt>
+  <wpt lat="52.615524" lon="10.062366"><name>Wegpunkt 12</name></wpt>
+  <wpt lat="52.616201" lon="10.062414"><name>Wegpunkt 13</name></wpt>
+  <wpt lat="52.617466" lon="10.062782"><name>Wegpunkt 14</name></wpt>
+  <wpt lat="52.617514" lon="10.063019"><name>Wegpunkt 15</name></wpt>
+  <wpt lat="52.617626" lon="10.063049"><name>Wegpunkt 16</name></wpt>
+  <wpt lat="52.617716" lon="10.062861"><name>Wegpunkt 17</name></wpt>
+  <wpt lat="52.617661" lon="10.062672"><name>Wegpunkt 18</name></wpt>
+  <wpt lat="52.617792" lon="10.061096"><name>Wegpunkt 19</name></wpt>
+  <wpt lat="52.61793" lon="10.059442"><name>Wegpunkt 20</name></wpt>
+  <wpt lat="52.617887" lon="10.058089"><name>Wegpunkt 21</name></wpt>
+  <wpt lat="52.617757" lon="10.057009"><name>Wegpunkt 22</name></wpt>
+  <wpt lat="52.617406" lon="10.056146"><name>Wegpunkt 23</name></wpt>
+  <wpt lat="52.617053" lon="10.054319"><name>Wegpunkt 24</name></wpt>
+  <wpt lat="52.617" lon="10.054366666666667"><name>Ziel</name></wpt>
+  <rte>
+    <name>Ludwig-Hölty</name>
+    <rtept lat="52.60807666666667" lon="10.068843333333334"><name>Start</name></rtept>
+    <rtept lat="52.608213" lon="10.068632"><name>Wegpunkt 1</name></rtept>
+    <rtept lat="52.608248" lon="10.067947"><name>Wegpunkt 2</name></rtept>
+    <rtept lat="52.608427" lon="10.06456"><name>Wegpunkt 3</name></rtept>
+    <rtept lat="52.608218" lon="10.064022"><name>Wegpunkt 4</name></rtept>
+    <rtept lat="52.608494" lon="10.063185"><name>Wegpunkt 5</name></rtept>
+    <rtept lat="52.608583" lon="10.061878"><name>Wegpunkt 6</name></rtept>
+    <rtept lat="52.608871" lon="10.059904"><name>Wegpunkt 7</name></rtept>
+    <rtept lat="52.609284" lon="10.060025"><name>Wegpunkt 8</name></rtept>
+    <rtept lat="52.611294" lon="10.061265"><name>Wegpunkt 9</name></rtept>
+    <rtept lat="52.612885" lon="10.061815"><name>Wegpunkt 10</name></rtept>
+    <rtept lat="52.614523" lon="10.062353"><name>Wegpunkt 11</name></rtept>
+    <rtept lat="52.615524" lon="10.062366"><name>Wegpunkt 12</name></rtept>
+    <rtept lat="52.616201" lon="10.062414"><name>Wegpunkt 13</name></rtept>
+    <rtept lat="52.617466" lon="10.062782"><name>Wegpunkt 14</name></rtept>
+    <rtept lat="52.617514" lon="10.063019"><name>Wegpunkt 15</name></rtept>
+    <rtept lat="52.617626" lon="10.063049"><name>Wegpunkt 16</name></rtept>
+    <rtept lat="52.617716" lon="10.062861"><name>Wegpunkt 17</name></rtept>
+    <rtept lat="52.617661" lon="10.062672"><name>Wegpunkt 18</name></rtept>
+    <rtept lat="52.617792" lon="10.061096"><name>Wegpunkt 19</name></rtept>
+    <rtept lat="52.61793" lon="10.059442"><name>Wegpunkt 20</name></rtept>
+    <rtept lat="52.617887" lon="10.058089"><name>Wegpunkt 21</name></rtept>
+    <rtept lat="52.617757" lon="10.057009"><name>Wegpunkt 22</name></rtept>
+    <rtept lat="52.617406" lon="10.056146"><name>Wegpunkt 23</name></rtept>
+    <rtept lat="52.617053" lon="10.054319"><name>Wegpunkt 24</name></rtept>
+    <rtept lat="52.617" lon="10.054366666666667"><name>Ziel</name></rtept>
+  </rte>
+  <trk>
+    <name>Ludwig-Hölty</name>
+    <trkseg>
+      <trkpt lat="52.60807666666667" lon="10.068843333333334" />
+      <trkpt lat="52.608213" lon="10.068632" />
+      <trkpt lat="52.608248" lon="10.067947" />
+      <trkpt lat="52.608427" lon="10.06456" />
+      <trkpt lat="52.608218" lon="10.064022" />
+      <trkpt lat="52.608494" lon="10.063185" />
+      <trkpt lat="52.608583" lon="10.061878" />
+      <trkpt lat="52.608871" lon="10.059904" />
+      <trkpt lat="52.609284" lon="10.060025" />
+      <trkpt lat="52.611294" lon="10.061265" />
+      <trkpt lat="52.612885" lon="10.061815" />
+      <trkpt lat="52.614523" lon="10.062353" />
+      <trkpt lat="52.615524" lon="10.062366" />
+      <trkpt lat="52.616201" lon="10.062414" />
+      <trkpt lat="52.617466" lon="10.062782" />
+      <trkpt lat="52.617514" lon="10.063019" />
+      <trkpt lat="52.617626" lon="10.063049" />
+      <trkpt lat="52.617716" lon="10.062861" />
+      <trkpt lat="52.617661" lon="10.062672" />
+      <trkpt lat="52.617792" lon="10.061096" />
+      <trkpt lat="52.61793" lon="10.059442" />
+      <trkpt lat="52.617887" lon="10.058089" />
+      <trkpt lat="52.617757" lon="10.057009" />
+      <trkpt lat="52.617406" lon="10.056146" />
+      <trkpt lat="52.617053" lon="10.054319" />
+      <trkpt lat="52.617" lon="10.054366666666667" />
+    </trkseg>
+  </trk>
+</gpx>

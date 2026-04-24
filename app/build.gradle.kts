@@ -51,6 +51,8 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.9.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("androidx.webkit:webkit:1.11.0")
+    implementation("androidx.core:core-splashscreen:1.0.1")
+    implementation("org.maplibre.gl:android-sdk:11.13.5")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

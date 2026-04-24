@@ -8,32 +8,97 @@
 </head>
 <body>
   <main class="app-shell">
+    <section id="kidMissionView" class="kid-mission" hidden>
+      <section class="kid-compass-panel">
+        <div class="kid-compass-shell">
+          <div class="kid-compass-ring">
+            <img class="kid-compass-base" src="./compass.png" alt="" aria-hidden="true" />
+            <div id="kidCompassDialRotor" class="kid-compass-dial-rotor" aria-hidden="true">
+              <img id="kidCompassDial" class="kid-compass-dial" src="./compass-ziffernblatt.png" alt="" aria-hidden="true" />
+              <div class="kid-cardinal kid-cardinal--north">N</div>
+              <div class="kid-cardinal kid-cardinal--east">O</div>
+              <div class="kid-cardinal kid-cardinal--south">S</div>
+              <div class="kid-cardinal kid-cardinal--west">W</div>
+            </div>
+            <div id="kidCompassNeedle" class="kid-compass-needle" hidden></div>
+          </div>
+        </div>
+
+        <div class="kid-distance-cluster">
+          <div id="kidDistanceValue" class="kid-distance-value">--</div>
+          <div class="kid-distance-scale">
+            <span id="kidDistanceScaleFill"></span>
+          </div>
+        </div>
+
+        <div id="kidHeadingDebug" class="kid-heading-debug">heading --</div>
+      </section>
+
+      <section class="kid-map-panel">
+        <div class="kid-map-fade"></div>
+        <svg id="kidMapSvg" class="kid-map-svg" viewBox="0 0 100 140" preserveAspectRatio="none" aria-hidden="true">
+          <g id="kidMapTerrain"></g>
+          <path id="kidMapRouteGlow" class="kid-map-route-glow" d="" />
+          <path id="kidMapRoute" class="kid-map-route" d="" />
+          <g id="kidMapTargetMarker" class="kid-map-target-marker" transform="translate(50 34) scale(1)">
+            <path class="kid-map-target-stroke kid-map-target-stroke-a" d="M -6 -7 L 5 7" />
+            <path class="kid-map-target-stroke kid-map-target-stroke-b" d="M 6 -6 L -5 8" />
+          </g>
+          <g id="kidMapPlayerMarker" class="kid-map-player-marker" transform="translate(50 104)">
+            <circle class="kid-map-player-ring" cx="0" cy="0" r="5.7"></circle>
+            <path class="kid-map-player-scribble" d="M -2.4 -1.6 C -0.8 -3.4 2.2 -3.0 2.8 -0.4 C 3.2 1.8 1.8 3.5 -0.2 3.1 C -2.4 2.7 -3.5 0.3 -2.4 -1.6 Z" />
+          </g>
+        </svg>
+      </section>
+    </section>
+
     <header class="topbar">
       <div>
-        <p class="eyebrow">Hybrid Navigator</p>
-        <h1>CacheKid Companion</h1>
+        <p id="appEyebrow" class="eyebrow">Hybrid Navigator</p>
+        <h1 id="appTitle">CacheKid Companion</h1>
       </div>
-      <button id="permissionsButton" class="secondary">Native Zugriff</button>
+      <button id="permissionsButton" class="secondary">Berechtigungen</button>
     </header>
 
+    <section id="missionOverviewCard" class="mission-overview" hidden>
+      <p class="eyebrow">Schatzmission</p>
+      <h2 id="missionTitle">--</h2>
+      <p id="missionSummary" class="mission-summary">--</p>
+      <div class="review-grid">
+        <article class="detail-card">
+          <span class="label">Schatzcode</span>
+          <strong id="missionCacheCode">--</strong>
+        </article>
+        <article class="detail-card">
+          <span class="label">Ziel</span>
+          <strong id="missionTargetLabel">--</strong>
+        </article>
+      </div>
+      <p id="missionHint" class="status status--tight">Folge dem Pfeil bis zum grossen X.</p>
+    </section>
+
     <section class="hero-card">
-      <div class="arrow-wrap">
-        <div id="arrow" class="arrow"></div>
+      <div class="idle-logo-wrap">
+        <img
+          class="idle-logo"
+          src="file:///android_res/drawable/cachekid_splash_logo.png"
+          alt="CacheKid Logo"
+        />
       </div>
       <div class="stats-grid">
-        <article class="stat-card">
+        <article id="distanceCard" class="stat-card">
           <span class="label">Distanz</span>
           <strong id="distanceValue">--</strong>
         </article>
-        <article class="stat-card">
+        <article id="headingCard" class="stat-card">
           <span class="label">Heading</span>
           <strong id="headingValue">--</strong>
         </article>
-        <article class="stat-card">
+        <article id="bearingCard" class="stat-card">
           <span class="label">Ziel-Bearing</span>
           <strong id="bearingValue">--</strong>
         </article>
-        <article class="stat-card">
+        <article id="sourceCard" class="stat-card">
           <span class="label">Quelle</span>
           <strong id="sourceValue">Browser</strong>
         </article>
@@ -116,6 +181,7 @@
     </section>
   </main>
 
-  <script type="module" src="./app.js"></script>
+  <script src="./navigation-runtime.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>

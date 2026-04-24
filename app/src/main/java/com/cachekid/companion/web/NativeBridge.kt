@@ -5,6 +5,7 @@ import android.location.Location
 import android.os.Build
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import com.cachekid.companion.host.mission.ActiveMission
 import com.cachekid.companion.host.mission.MissionDraft
 import com.cachekid.companion.data.HybridSensorRepository
 import com.cachekid.companion.host.resolution.CacheResolutionResult
@@ -23,6 +24,7 @@ class NativeBridge(
     private val getPendingImportSummary: () -> String?,
     private val getPendingShareDebugAction: () -> String?,
     private val getPendingMissionDraft: () -> MissionDraft?,
+    private val getActiveMission: () -> ActiveMission?,
     private val getPendingResolution: () -> CacheResolutionResult?,
     private val updatePendingMissionDraftAction: (String, String, String) -> MissionDraft?,
     private val resolvePendingCacheManuallyAction: (String, String) -> MissionDraft?,
@@ -73,6 +75,12 @@ class NativeBridge(
     fun getPendingMissionDraftJson(): String? {
         val draft = getPendingMissionDraft() ?: return null
         return draft.toJson()
+    }
+
+    @JavascriptInterface
+    fun getActiveMissionJson(): String? {
+        val mission = getActiveMission() ?: return null
+        return mission.toJson()
     }
 
     @JavascriptInterface
@@ -160,6 +168,25 @@ class NativeBridge(
         )
     }
 
+    fun notifyActiveMissionUpdated() {
+        emitEvent(
+            type = "active-mission-updated",
+            payload = JSONObject().apply {
+                put("activeMission", getActiveMission()?.let { JSONObject(it.toJson()) })
+            },
+        )
+    }
+
+    fun notifyMapOrientation(mapBearingDegrees: Double?, targetBearingDegrees: Double?) {
+        emitEvent(
+            type = "map-orientation",
+            payload = JSONObject().apply {
+                put("mapBearingDegrees", mapBearingDegrees)
+                put("targetBearingDegrees", targetBearingDegrees)
+            },
+        )
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     private fun emitLocationEvent(location: Location) {
         emitEvent(
@@ -200,7 +227,79 @@ class NativeBridge(
                     put("longitude", target.longitude)
                 },
             )
+            put(
+                "routeOrigin",
+                routeOrigin?.let {
+                    JSONObject().apply {
+                        put("latitude", it.latitude)
+                        put("longitude", it.longitude)
+                    }
+                },
+            )
             put("sourceApp", sourceApp)
+        }.toString()
+    }
+
+    private fun ActiveMission.toJson(): String {
+        return JSONObject().apply {
+            put("missionId", missionId)
+            put("cacheCode", cacheCode)
+            put("sourceTitle", sourceTitle)
+            put("childTitle", childTitle)
+            put("summary", summary)
+            put(
+                "target",
+                JSONObject().apply {
+                    put("latitude", target.latitude)
+                    put("longitude", target.longitude)
+                },
+            )
+            put(
+                "routeOrigin",
+                routeOrigin?.let {
+                    JSONObject().apply {
+                        put("latitude", it.latitude)
+                        put("longitude", it.longitude)
+                    }
+                },
+            )
+            put("sourceApp", sourceApp)
+            put(
+                "offlineMap",
+                offlineMap?.let { map ->
+                    JSONObject().apply {
+                        put("assetPath", map.assetPath)
+                        put("svgContent", map.svgContent)
+                        put(
+                            "bounds",
+                            JSONObject().apply {
+                                put("minLatitude", map.bounds.minLatitude)
+                                put("minLongitude", map.bounds.minLongitude)
+                                put("maxLatitude", map.bounds.maxLatitude)
+                                put("maxLongitude", map.bounds.maxLongitude)
+                            },
+                        )
+                    }
+                },
+            )
+            put(
+                "baseMap",
+                baseMap?.let { map ->
+                    JSONObject().apply {
+                        put("assetPath", map.assetPath)
+                        put("svgContent", map.svgContent)
+                        put(
+                            "bounds",
+                            JSONObject().apply {
+                                put("minLatitude", map.bounds.minLatitude)
+                                put("minLongitude", map.bounds.minLongitude)
+                                put("maxLatitude", map.bounds.maxLatitude)
+                                put("maxLongitude", map.bounds.maxLongitude)
+                            },
+                        )
+                    }
+                },
+            )
         }.toString()
     }
 }
