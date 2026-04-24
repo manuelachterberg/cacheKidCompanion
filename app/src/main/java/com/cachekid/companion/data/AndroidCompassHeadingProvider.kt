@@ -21,7 +21,6 @@ class AndroidCompassHeadingProvider(context: Context) : DeviceHeadingProvider {
     override val headingDegrees: Flow<Float> = callbackFlow {
         val rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
         if (rotationSensor == null) {
-            trySend(0f)
             close()
             return@callbackFlow
         }

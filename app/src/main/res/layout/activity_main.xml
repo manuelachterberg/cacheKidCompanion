@@ -22,6 +22,19 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <ImageButton
+        android:id="@+id/nativeKidMenuButton"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="12dp"
+        android:background="#FFFDF8"
+        android:contentDescription="Home"
+        android:elevation="8dp"
+        android:padding="14dp"
+        android:src="@drawable/ic_fa_house"
+        android:visibility="gone" />
+
     <FrameLayout
         android:id="@+id/kidZoneDebugOverlay"
         android:layout_width="match_parent"
@@ -310,6 +323,13 @@
             android:textColor="#5D5D55"
             android:textSize="12sp" />
 
+        <Button
+            android:id="@+id/nativeLoadMissionButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Mission laden" />
+
         <TextView
             android:id="@+id/nativeSideloadHint"
             android:layout_width="match_parent"
@@ -331,6 +351,30 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:text="Kein adb-Sideload importiert."
+            android:textColor="#5D5D55"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/nativeNavigationInputHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:textColor="#5D5D55"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/nativeNavigationImportButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="ADB-Navigation laden" />
+
+        <TextView
+            android:id="@+id/nativeNavigationStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Keine adb-Navigation importiert."
             android:textColor="#5D5D55"
             android:textSize="12sp" />
 
