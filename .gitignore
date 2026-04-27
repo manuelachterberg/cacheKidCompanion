@@ -10,3 +10,6 @@ captures/
 # OS files
 .DS_Store
 
+# Python tooling
+__pycache__/
+*.pyc
