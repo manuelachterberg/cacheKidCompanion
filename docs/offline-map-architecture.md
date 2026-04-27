@@ -70,6 +70,26 @@ The development sideload path accepts zip files containing `offline-map.json`, `
 The installer validates the manifest and required files before replacing an existing package directory.
 Imported source zips are archived into `imported/`; failed imports are archived into `failed/` with an error report.
 
+## Development Package Builder
+
+Small real-map test packages can be generated from OpenStreetMap/Overpass data with:
+
+```bash
+pip install pmtiles==3.7.0 mapbox-vector-tile==2.1.0
+python3 tools/build_offline_map_package.py \
+  --package-id test-celle \
+  --display-name "Test Celle" \
+  --version dev \
+  --min-lat 52.58 \
+  --min-lon 10.00 \
+  --max-lat 52.65 \
+  --max-lon 10.09 \
+  --output /tmp/cachekid-test-celle.zip
+```
+
+The builder creates an installable sideload zip with a real PMTiles vector archive and a label-free MapLibre style.
+It is intended for small device-validation regions. It is not the final country-scale update pipeline.
+
 ## Follow-Up Work
 
 - #26 installs and validates offline map packages on-device.
