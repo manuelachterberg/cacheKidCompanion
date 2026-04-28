@@ -174,6 +174,8 @@ Real kid-device offline maps are installed packages containing `offline-map.json
 Bundled `map.png` / `map.svg` basemaps are legacy prototype assets and must not be treated as proof that the device has a real offline map installed.
 For development, `tools/build_offline_map_package.py` can build a small real PMTiles sideload package for a test region.
 
+The repeatable real-device mission transfer test procedure is documented in `docs/real-device-transfer-test.md`.
+
 ### Kid map presentation
 
 The child map should stay:
