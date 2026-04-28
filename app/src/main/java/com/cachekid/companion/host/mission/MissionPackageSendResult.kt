@@ -9,6 +9,7 @@ data class MissionPackageSendResult(
     } else {
         MissionPackageSendStatus.FAILED
     },
+    val receiverStatus: MissionPackageReceiveStatus? = null,
 )
 
 enum class MissionPackageSendStatus {

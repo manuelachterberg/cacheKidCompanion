@@ -15,6 +15,15 @@ class MissionPackageZipImporter(
                 missionDirectory = null,
                 missionId = null,
                 errors = listOf("Mission package ZIP could not be decoded."),
+                status = MissionPackageImportStatus.ZIP_DECODE_FAILED,
+            )
+        }
+        if (files.isEmpty()) {
+            return MissionPackageImportResult(
+                missionDirectory = null,
+                missionId = null,
+                errors = listOf("Mission package ZIP could not be decoded."),
+                status = MissionPackageImportStatus.ZIP_DECODE_FAILED,
             )
         }
 
@@ -22,6 +31,7 @@ class MissionPackageZipImporter(
             missionDirectory = null,
             missionId = null,
             errors = listOf("Mission package manifest is missing or invalid."),
+            status = MissionPackageImportStatus.MANIFEST_INVALID,
         )
 
         val validation = validator.validate(missionPackage)
@@ -30,6 +40,7 @@ class MissionPackageZipImporter(
                 missionDirectory = null,
                 missionId = missionPackage.missionId,
                 errors = validation.errors,
+                status = MissionPackageImportStatus.VALIDATION_FAILED,
             )
         }
 
@@ -38,6 +49,11 @@ class MissionPackageZipImporter(
             missionDirectory = storeResult.missionDirectory,
             missionId = missionPackage.missionId,
             errors = storeResult.errors,
+            status = if (storeResult.isSuccess) {
+                MissionPackageImportStatus.IMPORTED
+            } else {
+                MissionPackageImportStatus.STORE_FAILED
+            },
         )
     }
 }
