@@ -54,11 +54,13 @@ class MissionPackageSenderClient(
                 val stream = if (statusCode in 200..299) connection.inputStream else connection.errorStream
                 stream?.bufferedReader()?.use { it.readText() }.orEmpty()
             }.getOrDefault("")
+            val receiverResponse = MissionPackageReceiveResponse.parse(responseText)
+            val responseMessage = receiverResponse?.message ?: responseText
 
             MissionPackageSendResult(
                 isSuccess = statusCode in 200..299,
                 statusCode = statusCode,
-                message = responseText.ifBlank {
+                message = responseMessage.ifBlank {
                     if (statusCode in 200..299) "Mission gesendet." else "Transfer fehlgeschlagen."
                 },
                 status = if (statusCode in 200..299) {
@@ -66,6 +68,7 @@ class MissionPackageSenderClient(
                 } else {
                     MissionPackageSendStatus.HTTP_ERROR
                 },
+                receiverStatus = receiverResponse?.status,
             )
         }.getOrElse { error ->
             MissionPackageSendResult(

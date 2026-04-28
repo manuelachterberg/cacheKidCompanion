@@ -33,7 +33,9 @@ class MissionPackageSenderClientTest {
 
             assertTrue(result.isSuccess)
             assertEquals(MissionPackageSendStatus.SENT, result.status)
-            assertTrue(result.message.contains("Stored ${missionPackage.missionId}"))
+            assertEquals(MissionPackageReceiveStatus.IMPORTED, result.receiverStatus)
+            assertTrue(result.message.contains("Mission empfangen"))
+            assertTrue(result.message.contains(missionPackage.missionId))
             assertTrue(statusMessages.any { it.contains("Mission empfangen") })
         } finally {
             receiver.stop()
@@ -126,6 +128,37 @@ class MissionPackageSenderClientTest {
         }
     }
 
+    @Test
+    fun `sender client maps receiver json error response`() {
+        val receiverResponse = MissionPackageReceiveResponse(
+            status = MissionPackageReceiveStatus.INVALID_ZIP,
+            missionId = null,
+            message = "Mission package ZIP could not be decoded.",
+            errors = listOf("Mission package ZIP could not be decoded."),
+        )
+        val server = SingleResponseServer(
+            statusCode = 422,
+            body = receiverResponse.toJson(),
+            contentType = "application/json; charset=utf-8",
+        )
+        val port = server.start()
+
+        try {
+            val missionPackage = requireNotNull(writer.write(validDraft()).missionPackage)
+            val result = senderClient.send(
+                host = "127.0.0.1",
+                port = port,
+                missionPackage = missionPackage,
+            )
+
+            assertEquals(MissionPackageSendStatus.HTTP_ERROR, result.status)
+            assertEquals(MissionPackageReceiveStatus.INVALID_ZIP, result.receiverStatus)
+            assertEquals("Mission package ZIP could not be decoded.", result.message)
+        } finally {
+            server.stop()
+        }
+    }
+
     private fun validDraft(): MissionDraft {
         return MissionDraft(
             cacheCode = "GC12345",
@@ -146,6 +179,7 @@ class MissionPackageSenderClientTest {
     private class SingleResponseServer(
         private val statusCode: Int,
         private val body: String,
+        private val contentType: String = "text/plain; charset=utf-8",
     ) {
         private val socket = ServerSocket(0)
         private val thread = Thread {
@@ -156,7 +190,7 @@ class MissionPackageSenderClientTest {
                 client.getOutputStream().write(
                     (
                         "HTTP/1.1 $statusCode $statusText\r\n" +
-                            "Content-Type: text/plain; charset=utf-8\r\n" +
+                            "Content-Type: $contentType\r\n" +
                             "Content-Length: ${payload.size}\r\n" +
                             "Connection: close\r\n\r\n"
                         ).toByteArray(Charsets.UTF_8),
