@@ -177,6 +177,7 @@ class MainActivity : AppCompatActivity() {
         kidNativeMapController = KidNativeMapController(
             context = this,
             mapContainer = binding.nativeKidMapContainer,
+            overlayContainer = binding.root,
         )
         kidNativeMapController.onCreate(savedInstanceState)
         nativeBridge = NativeBridge(

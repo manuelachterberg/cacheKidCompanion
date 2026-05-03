@@ -10,6 +10,7 @@ import android.graphics.Path
 import android.location.Location
 import android.os.SystemClock
 import android.util.Log
+import android.util.TypedValue
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -45,6 +46,7 @@ import java.io.File
 class KidNativeMapController(
     context: Context,
     private val mapContainer: FrameLayout,
+    private val overlayContainer: FrameLayout,
 ) {
     private companion object {
         const val OFFLINE_BASEMAP_SOURCE_ID = "cachekid-offline-basemap-source"
@@ -111,15 +113,27 @@ class KidNativeMapController(
         )
         mapContainer.addView(mapView)
 
+        val cardSizePx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, 56f, context.resources.displayMetrics,
+        ).toInt()
+        val marginPx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, 12f, context.resources.displayMetrics,
+        ).toInt()
         sourceIndicatorView = ImageView(context).apply {
-            layoutParams = FrameLayout.LayoutParams(56, 56).apply {
+            layoutParams = FrameLayout.LayoutParams(cardSizePx, cardSizePx).apply {
                 gravity = android.view.Gravity.BOTTOM or android.view.Gravity.END
-                bottomMargin = 16
-                rightMargin = 16
+                bottomMargin = marginPx
+                rightMargin = marginPx + cardSizePx + marginPx
             }
             visibility = View.GONE
+            setBackgroundColor(Color.parseColor("#FFFDF8"))
+            elevation = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, 8f, context.resources.displayMetrics,
+            )
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
         }
-        mapContainer.addView(sourceIndicatorView)
+        overlayContainer.addView(sourceIndicatorView)
+        sourceIndicatorView.bringToFront()
     }
 
     fun onCreate(savedInstanceState: android.os.Bundle?) {
@@ -179,6 +193,7 @@ class KidNativeMapController(
             lastZoneFitUsedStrict = true
         }
         mapContainer.visibility = if (mission != null) View.VISIBLE else View.GONE
+        sourceIndicatorView.visibility = if (mission != null) View.VISIBLE else View.GONE
         if (missionChanged || mission == null) {
             applyStyleForMission(mapLibreMap ?: return, mission)
         } else {
@@ -215,82 +230,88 @@ class KidNativeMapController(
             else -> buildNoSignalIconBitmap()
         }
         sourceIndicatorView.setImageBitmap(icon)
-        sourceIndicatorView.visibility = if (currentMission != null) View.VISIBLE else View.GONE
     }
 
     private fun buildGpsIconBitmap(): Bitmap {
-        val bitmap = Bitmap.createBitmap(56, 56, Bitmap.Config.ARGB_8888)
+        val bitmap = Bitmap.createBitmap(120, 120, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#2E7D32")
-            style = Paint.Style.FILL
-        }
-        val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             style = Paint.Style.STROKE
-            strokeWidth = 3f
+            strokeWidth = 14f
         }
-        // Draw location pin shape
-        val path = Path().apply {
-            moveTo(28f, 8f)
-            cubicTo(16f, 8f, 8f, 18f, 8f, 26f)
-            cubicTo(8f, 38f, 28f, 50f, 28f, 50f)
-            cubicTo(28f, 50f, 48f, 38f, 48f, 26f)
-            cubicTo(48f, 18f, 40f, 8f, 28f, 8f)
-            close()
+        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.STROKE
+            strokeWidth = 10f
         }
-        canvas.drawPath(path, ink)
-        canvas.drawPath(path, outline)
-        // Inner dot
-        canvas.drawCircle(28f, 24f, 6f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE })
+        val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(60f, 60f, 40f, halo)
+        canvas.drawCircle(60f, 60f, 40f, ink)
+        canvas.drawCircle(60f, 60f, 16f, dot)
         return bitmap
     }
 
     private fun buildPhoneIconBitmap(): Bitmap {
-        val bitmap = Bitmap.createBitmap(56, 56, Bitmap.Config.ARGB_8888)
+        val bitmap = Bitmap.createBitmap(120, 120, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#1565C0")
-            style = Paint.Style.FILL
-        }
-        val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             style = Paint.Style.STROKE
-            strokeWidth = 3f
+            strokeWidth = 14f
         }
-        // Draw rounded rectangle (phone body)
-        val rect = android.graphics.RectF(12f, 6f, 44f, 50f)
-        canvas.drawRoundRect(rect, 6f, 6f, ink)
-        canvas.drawRoundRect(rect, 6f, 6f, outline)
-        // Screen
-        canvas.drawRoundRect(
-            android.graphics.RectF(16f, 12f, 40f, 40f),
-            3f, 3f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE },
-        )
+        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.STROKE
+            strokeWidth = 10f
+        }
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.FILL
+        }
+        val inner = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.FILL
+        }
+        // Outer rounded rect
+        val outerRect = android.graphics.RectF(20f, 10f, 100f, 110f)
+        canvas.drawRoundRect(outerRect, 12f, 12f, halo)
+        canvas.drawRoundRect(outerRect, 12f, 12f, ink)
+        canvas.drawRoundRect(outerRect, 12f, 12f, fill)
+        // Inner screen
+        val innerRect = android.graphics.RectF(32f, 26f, 88f, 84f)
+        canvas.drawRoundRect(innerRect, 6f, 6f, inner)
         // Home button dot
-        canvas.drawCircle(28f, 45f, 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE })
+        canvas.drawCircle(60f, 98f, 6f, inner)
         return bitmap
     }
 
     private fun buildNoSignalIconBitmap(): Bitmap {
-        val bitmap = Bitmap.createBitmap(56, 56, Bitmap.Config.ARGB_8888)
+        val bitmap = Bitmap.createBitmap(120, 120, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#9E9E9E")
-            style = Paint.Style.FILL
-        }
-        // Draw hollow circle with cross
-        canvas.drawCircle(28f, 28f, 18f, ink)
-        canvas.drawCircle(28f, 28f, 14f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F4F2EA") })
-        val cross = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#9E9E9E")
+        val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
             style = Paint.Style.STROKE
-            strokeWidth = 3f
+            strokeWidth = 14f
+        }
+        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.STROKE
+            strokeWidth = 10f
+        }
+        val cross = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.STROKE
+            strokeWidth = 10f
             strokeCap = Paint.Cap.ROUND
         }
-        canvas.drawLine(20f, 20f, 36f, 36f, cross)
-        canvas.drawLine(36f, 20f, 20f, 36f, cross)
+        canvas.drawCircle(60f, 60f, 40f, halo)
+        canvas.drawCircle(60f, 60f, 40f, ink)
+        canvas.drawLine(36f, 36f, 84f, 84f, cross)
+        canvas.drawLine(84f, 36f, 36f, 84f, cross)
         return bitmap
     }
 
