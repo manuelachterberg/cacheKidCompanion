@@ -1,85 +1,62 @@
 # AGENTS.md
 
-This repository is run with strict delivery rules. Agents working here are expected to preserve clarity, testability, and long-term maintainability over short-term speed.
+This repository expects disciplined delivery. Prefer clarity, testability, and maintainability over short-term speed.
 
-## Central standard
+## Project quick context
 
-Professional engineering behavior is a core repository requirement, not a preference.
+- The long-term host platform is iPhone; Android host code in this repository is prototype or reference code unless explicitly reaffirmed.
+- Meebook-side Android work is first-class product work.
+- Child-facing UI should stay minimal and avoid technical/debug detail.
+- The target offline map architecture is device-local PMTiles packages, not ad hoc generated basemap payloads as a hidden default.
+- See `docs/engineering-model.md` for the fuller operating model and repository-specific architecture rules.
 
-That means:
+## Core standard
 
-- work is planned before it sprawls
-- architecture is kept intentional
-- refactoring is expected when code starts to drift
-- every feature gets meaningful automated coverage
-- every issue should add test coverage or explicitly explain why that is not yet practical
-- no one treats temporary shortcuts as invisible debt
-- repository hygiene, issue hygiene, PR hygiene, and CI hygiene are part of the implementation itself
-
-If a proposed change would weaken those standards, the correct action is to tighten the implementation, split the work, or create explicit follow-up issues before merge.
-
-See `docs/engineering-model.md` for the repository operating model that those standards map to.
-
-## Core principles
-
-- Do not let the codebase drift into hidden coupling or ad-hoc structure.
+- Plan non-trivial work before implementation sprawls.
+- Keep architecture intentional; do not add hidden coupling or ad hoc structure.
 - Prefer small, explicit modules with narrow responsibilities.
-- Refactor when a feature would otherwise add duplication, fragile branching, or mixed concerns.
-- Keep domain logic out of framework-heavy entrypoints when possible.
-- Make architectural tradeoffs explicit in pull requests and issue comments.
+- Refactor when a change would otherwise add duplication, mixed concerns, or logic trapped in hard-to-test UI/framework code.
+- Treat repository hygiene, issue hygiene, PR hygiene, and CI hygiene as part of the implementation.
+- If a change would weaken these standards, tighten the implementation, split the scope, or create an explicit follow-up issue before merge.
 
-## Planning and issue hygiene
+## Planning and status
 
 - Every non-trivial change should map to a GitHub issue.
-- Treat GitHub issue state, PR state, and GitHub Project board state as one combined source of truth when reporting or assessing work status.
-- When checking status, do not stop at `OPEN` / `CLOSED`; also verify whether the related item is in `Todo`, `In Progress`, or `Done` on the active project board.
-- If implementation reveals missing work, create a follow-up issue before merging.
-- Do not leave implicit TODOs in code as the only record of deferred work.
-- If a task grows beyond its original scope, split the remaining work into new issues instead of silently expanding the change.
+- Default scope is one reviewable issue per pull request unless a small combined slice is clearly better.
+- If work grows beyond the original scope, split the remaining work into new issues instead of silently expanding the change.
+- Treat GitHub issue state, PR state, and Project board state as one combined source of truth when reporting status.
+- When checking status, verify both the item state and whether it is in `Todo`, `In Progress`, or `Done` on the active project board.
+- If GitHub or project-board state is not available from the current environment, say that explicitly instead of guessing.
+- Do not leave implicit code TODOs as the only record of deferred work.
 
 ## Test policy
 
-- Every feature should come with at least one meaningful automated test case.
-- As a default rule, every issue should either:
-  - add a new automated test case,
-  - extend an existing test suite with coverage for the changed behavior, or
-  - explicitly document why automated coverage is not yet practical.
+- Every feature should add at least one meaningful automated test case.
+- Every issue should either add a test, extend relevant coverage, or explicitly document why automated coverage is not yet practical.
 - Bug fixes should include a regression test whenever technically possible.
-- Pure logic belongs in testable units rather than being trapped in activities, views, or event handlers.
-- UI-heavy changes should still extract testable decision logic where possible.
+- Extract pure logic into testable units instead of leaving it trapped in activities, views, or event handlers.
+- UI-heavy changes should still pull decision logic into testable code where practical.
 
-## CI expectations
+## CI and merge rules
 
-- Keep the GitHub Actions checks green.
-- The required checks for `main` are:
-  - `frontend-tests`
-  - `android-tests`
+- Keep GitHub Actions green.
+- The required checks for `main` are `frontend-tests` and `android-tests`.
 - Do not merge changes that weaken CI coverage without replacing that coverage elsewhere.
+- `main` is protected and should be updated through pull requests, not direct pushes, unless the user explicitly requests a small repository-process or documentation change on `main`.
+- Do not bypass review, required checks, branch protection, or unresolved conversations.
 
-## Branching and merge rules
+## Branch and PR expectations
 
-- `main` is protected and should only be updated through pull requests.
-- Do not bypass review, required checks, or conversation resolution.
-- Assume branch protection is intentional and design work to fit inside it.
-- On non-`main` branches, pushed commits are the default expectation once the user asks for a commit, PR, or CI-visible update.
-- Do not leave requested work stranded only in the local checkout unless the user explicitly asks to keep it local.
-
-## Pull request expectations
-
-- Reference the driving issue.
-- Summarize behavior changes, refactors, and risks separately when they are distinct.
-- Call out missing tests explicitly instead of implying they are covered.
-- Keep pull requests scoped so that they can be reviewed for architecture, behavior, and test quality.
-
-## Refactoring rule
-
-- If touching messy code, leave it cleaner than you found it.
-- If a safe cleanup is directly adjacent to the change, do it in the same pull request.
-- If a broader cleanup is needed but would blur the scope, create a follow-up issue and reference it.
+- On non-`main` branches, once the user asks for a commit, PR, or CI-visible update, pushing commits is the default expectation unless the user asks to keep work local.
+- Reference the driving issue in the PR.
+- Keep PRs scoped so reviewers can evaluate behavior, architecture, and tests without reconstructing intent from the diff.
+- Summarize behavior changes, refactors, and risks separately when they are materially distinct.
+- Call out missing tests explicitly.
+- If you touch messy code, leave it cleaner; do adjacent safe cleanup in the same PR, and track broader cleanup in a follow-up issue.
 
 ## Anti-patterns
 
 - No silent fallbacks that hide failure modes.
-- No large unstructured files that mix domain logic, UI orchestration, and integration glue.
-- No testless feature work unless the limitation is explicit and documented.
-- No direct pushes to `main` unless the user explicitly requests a direct `main` update for a small repository-process or documentation rule change.
+- No large unstructured files mixing domain logic, UI orchestration, and integration glue.
+- No testless feature work unless the limitation is explicit.
+- No silent architectural drift toward Android-host-specific expansion when shared mission-domain code is the better direction.
