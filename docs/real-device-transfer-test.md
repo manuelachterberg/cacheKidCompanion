@@ -36,6 +36,7 @@ Network:
 - both devices must be on the same Wi-Fi or hotspot network
 - client isolation must be disabled on the network
 - the host must be able to reach the kid device on TCP port `8765`
+- the app intentionally permits cleartext HTTP because the MVP receiver uses local `http://<kid-ip>:8765/missions`
 
 Build:
 
@@ -151,6 +152,7 @@ Host-side expected failures:
 | Blank address | `Empfangsadresse fehlt.` |
 | Invalid port | `Port ist ungueltig.` |
 | Wrong IP or receiver stopped | connection failure message |
+| Cleartext HTTP blocked | app build is missing the intentional local-transfer cleartext permission |
 | Kid rejects package | HTTP error with the kid receiver message |
 | Timeout | timeout message |
 
