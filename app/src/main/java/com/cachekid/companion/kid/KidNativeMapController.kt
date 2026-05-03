@@ -38,9 +38,6 @@ import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
-import org.maplibre.geojson.Feature
-import org.maplibre.geojson.FeatureCollection
-import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 import java.io.File
 
@@ -59,8 +56,11 @@ class KidNativeMapController(
         const val ROUTE_UNDERLAY_LAYER_ID = "cachekid-route-underlay-layer"
         const val ROUTE_LAYER_ID = "cachekid-route-layer"
         const val ROUTE_ACCENT_LAYER_ID = "cachekid-route-accent-layer"
+        const val WAYPOINT_SOURCE_ID = "cachekid-waypoint-source"
+        const val WAYPOINT_LAYER_ID = "cachekid-waypoint-layer"
         const val TARGET_ICON_ID = "cachekid-target-icon"
         const val PLAYER_ICON_ID = "cachekid-player-icon"
+        const val WAYPOINT_ICON_ID = "cachekid-waypoint-icon"
         const val CAMERA_LOG_TAG = "CacheKidCamera"
     }
 
@@ -306,11 +306,10 @@ class KidNativeMapController(
         val targetSource = style.getSourceAs<GeoJsonSource>(TARGET_SOURCE_ID) ?: return
         val playerSource = style.getSourceAs<GeoJsonSource>(PLAYER_SOURCE_ID) ?: return
         val routeSource = style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE_ID) ?: return
+        val waypointSource = style.getSourceAs<GeoJsonSource>(WAYPOINT_SOURCE_ID) ?: return
         val targetPoint = Point.fromLngLat(mission.target.longitude, mission.target.latitude)
         targetSource.setGeoJson(
-            FeatureCollection.fromFeatures(
-                buildTargetFeatures(targetPoint),
-            ),
+            MissionOverlayGeometry.buildTargetFeatureCollection(targetPoint),
         )
 
         val fallbackRouteStart = displayedRouteStart ?: resolveDisplayRouteStart(mission).also {
@@ -320,23 +319,29 @@ class KidNativeMapController(
         val routeStartPoint = Point.fromLngLat(activeRoute.routeStart.longitude, activeRoute.routeStart.latitude)
         val playerPoint = Point.fromLngLat(activeRoute.playerPoint.longitude, activeRoute.playerPoint.latitude)
         playerSource.setGeoJson(
-            FeatureCollection.fromFeatures(
-                buildPlayerFeatures(playerPoint),
-            ),
+            MissionOverlayGeometry.buildPlayerFeatureCollection(playerPoint),
         )
 
-        val routeFeatures = buildRouteFeatures(
-            routeStartPoint = routeStartPoint,
-            waypoints = activeRoute.remainingWaypoints.map { waypoint ->
-                Point.fromLngLat(waypoint.longitude, waypoint.latitude)
-            },
-            targetPoint = targetPoint,
+        val routeWaypoints = activeRoute.remainingWaypoints.map { waypoint ->
+            Point.fromLngLat(waypoint.longitude, waypoint.latitude)
+        }
+        val allWaypoints = mission.waypoints.map { waypoint ->
+            Point.fromLngLat(waypoint.longitude, waypoint.latitude)
+        }
+        routeSource.setGeoJson(
+            MissionOverlayGeometry.buildRouteFeatureCollection(
+                routeStartPoint = routeStartPoint,
+                waypoints = routeWaypoints,
+                targetPoint = targetPoint,
+            ),
+        )
+        waypointSource.setGeoJson(
+            MissionOverlayGeometry.buildWaypointFeatureCollection(allWaypoints),
         )
         Log.d(
             CAMERA_LOG_TAG,
             "updateMissionOverlays mission=${mission.missionId} currentLocation=${currentLocation?.latitude},${currentLocation?.longitude} routeStart=${activeRoute.routeStart.latitude},${activeRoute.routeStart.longitude} player=${activeRoute.playerPoint.latitude},${activeRoute.playerPoint.longitude} waypointCount=${activeRoute.remainingWaypoints.size}/${mission.waypoints.size} target=${mission.target.latitude},${mission.target.longitude}",
         )
-        routeSource.setGeoJson(FeatureCollection.fromFeatures(routeFeatures))
     }
 
     private fun ensureMissionOverlayLayers(style: Style) {
@@ -346,6 +351,9 @@ class KidNativeMapController(
         if (style.getImage(PLAYER_ICON_ID) == null) {
             style.addImage(PLAYER_ICON_ID, buildPlayerMarkerBitmap())
         }
+        if (style.getImage(WAYPOINT_ICON_ID) == null) {
+            style.addImage(WAYPOINT_ICON_ID, buildWaypointMarkerBitmap())
+        }
         if (style.getSource(TARGET_SOURCE_ID) == null) {
             style.addSource(GeoJsonSource(TARGET_SOURCE_ID))
         }
@@ -354,6 +362,9 @@ class KidNativeMapController(
         }
         if (style.getSource(ROUTE_SOURCE_ID) == null) {
             style.addSource(GeoJsonSource(ROUTE_SOURCE_ID))
+        }
+        if (style.getSource(WAYPOINT_SOURCE_ID) == null) {
+            style.addSource(GeoJsonSource(WAYPOINT_SOURCE_ID))
         }
         if (style.getLayer(ROUTE_UNDERLAY_LAYER_ID) == null) {
             style.addLayer(
@@ -387,6 +398,16 @@ class KidNativeMapController(
                     lineDasharray(arrayOf(0.6f, 3.2f)),
                     lineCap(LINE_CAP_ROUND),
                     lineJoin(LINE_JOIN_ROUND),
+                ),
+            )
+        }
+        if (style.getLayer(WAYPOINT_LAYER_ID) == null) {
+            style.addLayer(
+                SymbolLayer(WAYPOINT_LAYER_ID, WAYPOINT_SOURCE_ID).withProperties(
+                    iconImage(WAYPOINT_ICON_ID),
+                    iconSize(1.0f),
+                    iconAllowOverlap(true),
+                    iconIgnorePlacement(true),
                 ),
             )
         }
@@ -454,40 +475,7 @@ class KidNativeMapController(
         }
     }
 
-    private fun buildTargetFeatures(targetPoint: Point): List<Feature> {
-        return listOf(Feature.fromGeometry(targetPoint))
-    }
 
-    private fun buildPlayerFeatures(playerPoint: Point): List<Feature> {
-        return listOf(Feature.fromGeometry(playerPoint))
-    }
-
-    private fun buildRouteFeatures(
-        routeStartPoint: Point,
-        waypoints: List<Point>,
-        targetPoint: Point,
-    ): List<Feature> {
-        val routePoints = buildList {
-            add(routeStartPoint)
-            addAll(waypoints)
-            add(targetPoint)
-        }
-        if (routePoints.size < 2) {
-            return emptyList()
-        }
-        val primaryPoints = routePoints
-        val sketchA = Feature.fromGeometry(
-            LineString.fromLngLats(
-                primaryPoints,
-            ),
-        )
-        val sketchB = Feature.fromGeometry(
-            LineString.fromLngLats(
-                primaryPoints,
-            ),
-        )
-        return listOf(sketchA, sketchB)
-    }
 
     private fun buildTargetMarkerBitmap(): Bitmap {
         val bitmap = Bitmap.createBitmap(124, 124, Bitmap.Config.ARGB_8888)
@@ -566,6 +554,26 @@ class KidNativeMapController(
         canvas.drawCircle(56f, 56f, 26f, halo)
         canvas.drawCircle(56f, 56f, 26f, ink)
         canvas.drawCircle(56f, 56f, 10f, dot)
+        return bitmap
+    }
+
+    private fun buildWaypointMarkerBitmap(): Bitmap {
+        val bitmap = Bitmap.createBitmap(80, 80, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.FILL
+        }
+        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#111111")
+            style = Paint.Style.FILL
+        }
+        // Draw a small filled circle with white halo for E-ink contrast
+        val cx = 40f
+        val cy = 40f
+        val size = 18f
+        canvas.drawCircle(cx, cy, size + 8f, halo)
+        canvas.drawCircle(cx, cy, size, ink)
         return bitmap
     }
 
