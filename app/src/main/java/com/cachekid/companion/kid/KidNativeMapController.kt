@@ -10,8 +10,10 @@ import android.graphics.Path
 import android.location.Location
 import android.os.SystemClock
 import android.util.Log
+import android.util.TypedValue
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.ImageView
 import com.cachekid.companion.host.mission.ActiveMission
 import com.cachekid.companion.host.mission.OfflineBaseMapPackage
 import org.maplibre.android.MapLibre
@@ -44,6 +46,7 @@ import java.io.File
 class KidNativeMapController(
     context: Context,
     private val mapContainer: FrameLayout,
+    private val overlayContainer: FrameLayout,
 ) {
     private companion object {
         const val OFFLINE_BASEMAP_SOURCE_ID = "cachekid-offline-basemap-source"
@@ -91,6 +94,7 @@ class KidNativeMapController(
     private var viewportTopInsetPx: Float? = null
     private var viewportBottomInsetPx: Float? = null
     private var lastZoneFitUsedStrict = true
+    private val sourceIndicatorView: ImageView
 
     init {
         MapLibre.getInstance(context.applicationContext)
@@ -108,6 +112,28 @@ class KidNativeMapController(
             FrameLayout.LayoutParams.MATCH_PARENT,
         )
         mapContainer.addView(mapView)
+
+        val cardSizePx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, 56f, context.resources.displayMetrics,
+        ).toInt()
+        val marginPx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, 12f, context.resources.displayMetrics,
+        ).toInt()
+        sourceIndicatorView = ImageView(context).apply {
+            layoutParams = FrameLayout.LayoutParams(cardSizePx, cardSizePx).apply {
+                gravity = android.view.Gravity.BOTTOM or android.view.Gravity.END
+                bottomMargin = marginPx
+                rightMargin = marginPx + cardSizePx + marginPx
+            }
+            visibility = View.GONE
+            setBackgroundColor(Color.parseColor("#FFFDF8"))
+            elevation = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, 8f, context.resources.displayMetrics,
+            )
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+        }
+        overlayContainer.addView(sourceIndicatorView)
+        sourceIndicatorView.bringToFront()
     }
 
     fun onCreate(savedInstanceState: android.os.Bundle?) {
@@ -167,6 +193,7 @@ class KidNativeMapController(
             lastZoneFitUsedStrict = true
         }
         mapContainer.visibility = if (mission != null) View.VISIBLE else View.GONE
+        sourceIndicatorView.visibility = if (mission != null) View.VISIBLE else View.GONE
         if (missionChanged || mission == null) {
             applyStyleForMission(mapLibreMap ?: return, mission)
         } else {
@@ -194,6 +221,98 @@ class KidNativeMapController(
     fun updateHeading(headingDegrees: Float?) {
         currentHeadingDegrees = headingDegrees
         applyOrientationBearing()
+    }
+
+    fun updateNavigationSource(locationSource: String, headingSource: String) {
+        val icon = when {
+            locationSource.equals("onboard", ignoreCase = true) || headingSource.equals("onboard", ignoreCase = true) -> buildGpsIconBitmap()
+            locationSource.equals("injected", ignoreCase = true) || headingSource.equals("injected", ignoreCase = true) -> buildPhoneIconBitmap()
+            else -> buildNoSignalIconBitmap()
+        }
+        sourceIndicatorView.setImageBitmap(icon)
+    }
+
+    private fun buildGpsIconBitmap(): Bitmap {
+        val bitmap = Bitmap.createBitmap(120, 120, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 14f
+        }
+        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.STROKE
+            strokeWidth = 10f
+        }
+        val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(60f, 60f, 40f, halo)
+        canvas.drawCircle(60f, 60f, 40f, ink)
+        canvas.drawCircle(60f, 60f, 16f, dot)
+        return bitmap
+    }
+
+    private fun buildPhoneIconBitmap(): Bitmap {
+        val bitmap = Bitmap.createBitmap(120, 120, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 14f
+        }
+        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.STROKE
+            strokeWidth = 10f
+        }
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.FILL
+        }
+        val inner = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.FILL
+        }
+        // Outer rounded rect
+        val outerRect = android.graphics.RectF(20f, 10f, 100f, 110f)
+        canvas.drawRoundRect(outerRect, 12f, 12f, halo)
+        canvas.drawRoundRect(outerRect, 12f, 12f, ink)
+        canvas.drawRoundRect(outerRect, 12f, 12f, fill)
+        // Inner screen
+        val innerRect = android.graphics.RectF(32f, 26f, 88f, 84f)
+        canvas.drawRoundRect(innerRect, 6f, 6f, inner)
+        // Home button dot
+        canvas.drawCircle(60f, 98f, 6f, inner)
+        return bitmap
+    }
+
+    private fun buildNoSignalIconBitmap(): Bitmap {
+        val bitmap = Bitmap.createBitmap(120, 120, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 14f
+        }
+        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.STROKE
+            strokeWidth = 10f
+        }
+        val cross = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.STROKE
+            strokeWidth = 10f
+            strokeCap = Paint.Cap.ROUND
+        }
+        canvas.drawCircle(60f, 60f, 40f, halo)
+        canvas.drawCircle(60f, 60f, 40f, ink)
+        canvas.drawLine(36f, 36f, 84f, 84f, cross)
+        canvas.drawLine(84f, 36f, 36f, 84f, cross)
+        return bitmap
     }
 
     fun getLastCameraDebugInfo(): CameraDebugInfo? = lastCameraDebugInfo
