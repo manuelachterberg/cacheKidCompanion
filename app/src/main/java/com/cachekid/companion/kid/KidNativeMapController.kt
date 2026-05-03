@@ -12,6 +12,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.ImageView
 import com.cachekid.companion.host.mission.ActiveMission
 import com.cachekid.companion.host.mission.OfflineBaseMapPackage
 import org.maplibre.android.MapLibre
@@ -91,6 +92,7 @@ class KidNativeMapController(
     private var viewportTopInsetPx: Float? = null
     private var viewportBottomInsetPx: Float? = null
     private var lastZoneFitUsedStrict = true
+    private val sourceIndicatorView: ImageView
 
     init {
         MapLibre.getInstance(context.applicationContext)
@@ -108,6 +110,16 @@ class KidNativeMapController(
             FrameLayout.LayoutParams.MATCH_PARENT,
         )
         mapContainer.addView(mapView)
+
+        sourceIndicatorView = ImageView(context).apply {
+            layoutParams = FrameLayout.LayoutParams(56, 56).apply {
+                gravity = android.view.Gravity.BOTTOM or android.view.Gravity.END
+                bottomMargin = 16
+                rightMargin = 16
+            }
+            visibility = View.GONE
+        }
+        mapContainer.addView(sourceIndicatorView)
     }
 
     fun onCreate(savedInstanceState: android.os.Bundle?) {
@@ -194,6 +206,92 @@ class KidNativeMapController(
     fun updateHeading(headingDegrees: Float?) {
         currentHeadingDegrees = headingDegrees
         applyOrientationBearing()
+    }
+
+    fun updateNavigationSource(locationSource: String, headingSource: String) {
+        val icon = when {
+            locationSource.equals("onboard", ignoreCase = true) || headingSource.equals("onboard", ignoreCase = true) -> buildGpsIconBitmap()
+            locationSource.equals("injected", ignoreCase = true) || headingSource.equals("injected", ignoreCase = true) -> buildPhoneIconBitmap()
+            else -> buildNoSignalIconBitmap()
+        }
+        sourceIndicatorView.setImageBitmap(icon)
+        sourceIndicatorView.visibility = if (currentMission != null) View.VISIBLE else View.GONE
+    }
+
+    private fun buildGpsIconBitmap(): Bitmap {
+        val bitmap = Bitmap.createBitmap(56, 56, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#2E7D32")
+            style = Paint.Style.FILL
+        }
+        val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+        }
+        // Draw location pin shape
+        val path = Path().apply {
+            moveTo(28f, 8f)
+            cubicTo(16f, 8f, 8f, 18f, 8f, 26f)
+            cubicTo(8f, 38f, 28f, 50f, 28f, 50f)
+            cubicTo(28f, 50f, 48f, 38f, 48f, 26f)
+            cubicTo(48f, 18f, 40f, 8f, 28f, 8f)
+            close()
+        }
+        canvas.drawPath(path, ink)
+        canvas.drawPath(path, outline)
+        // Inner dot
+        canvas.drawCircle(28f, 24f, 6f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE })
+        return bitmap
+    }
+
+    private fun buildPhoneIconBitmap(): Bitmap {
+        val bitmap = Bitmap.createBitmap(56, 56, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#1565C0")
+            style = Paint.Style.FILL
+        }
+        val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+        }
+        // Draw rounded rectangle (phone body)
+        val rect = android.graphics.RectF(12f, 6f, 44f, 50f)
+        canvas.drawRoundRect(rect, 6f, 6f, ink)
+        canvas.drawRoundRect(rect, 6f, 6f, outline)
+        // Screen
+        canvas.drawRoundRect(
+            android.graphics.RectF(16f, 12f, 40f, 40f),
+            3f, 3f,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE },
+        )
+        // Home button dot
+        canvas.drawCircle(28f, 45f, 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE })
+        return bitmap
+    }
+
+    private fun buildNoSignalIconBitmap(): Bitmap {
+        val bitmap = Bitmap.createBitmap(56, 56, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#9E9E9E")
+            style = Paint.Style.FILL
+        }
+        // Draw hollow circle with cross
+        canvas.drawCircle(28f, 28f, 18f, ink)
+        canvas.drawCircle(28f, 28f, 14f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F4F2EA") })
+        val cross = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#9E9E9E")
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+            strokeCap = Paint.Cap.ROUND
+        }
+        canvas.drawLine(20f, 20f, 36f, 36f, cross)
+        canvas.drawLine(36f, 20f, 20f, 36f, cross)
+        return bitmap
     }
 
     fun getLastCameraDebugInfo(): CameraDebugInfo? = lastCameraDebugInfo

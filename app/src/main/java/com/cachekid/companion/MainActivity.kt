@@ -25,7 +25,9 @@ import com.cachekid.companion.config.PermissionRequirements
 import com.cachekid.companion.databinding.ActivityMainBinding
 import com.cachekid.companion.data.HybridSensorRepository
 import com.cachekid.companion.data.InjectedNavigationInputFileImporter
+import com.cachekid.companion.data.InjectedNavigationInputImportResult
 import com.cachekid.companion.data.InjectedNavigationInputImportStatus
+import com.cachekid.companion.data.InjectedNavigationInputPoller
 import com.cachekid.companion.data.NavigationInputMode
 import com.cachekid.companion.host.importing.HostShareImportService
 import com.cachekid.companion.host.importing.MissionDraftFactory
@@ -85,6 +87,9 @@ class MainActivity : AppCompatActivity() {
     private val missionPackageSideloadImporter = MissionPackageSideloadImporter()
     private val offlineBaseMapPackageSideloadImporter = OfflineBaseMapPackageSideloadImporter()
     private val injectedNavigationInputImporter = InjectedNavigationInputFileImporter()
+    private val navigationInputPoller = InjectedNavigationInputPoller(
+        importLatest = { dirs -> injectedNavigationInputImporter.importLatest(dirs) },
+    )
     private val missionPackageSenderClient = MissionPackageSenderClient()
     private val missionTargetParser = MissionTargetParser()
     private val hostMissionBuilderPresenter = HostMissionBuilderPresenter(missionTargetParser)
@@ -313,6 +318,8 @@ class MainActivity : AppCompatActivity() {
         observeNativeLocationForMap()
         observeNativeHeadingForMap()
         observeNavigationInputStatus()
+        observeNavigationSourcesForMap()
+        startNavigationInputPolling()
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -355,6 +362,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        navigationInputPoller.stop()
         receiveServer?.stop()
         kidNativeMapController.onDestroy()
         binding.webView.apply {
@@ -1327,6 +1335,31 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun observeNavigationSourcesForMap() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                sensorRepository.selectedLocationSource.collectLatest { locationSource ->
+                    val headingSource = sensorRepository.selectedHeadingSource.value
+                    kidNativeMapController.updateNavigationSource(
+                        locationSource = locationSource.name,
+                        headingSource = headingSource.name,
+                    )
+                }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                sensorRepository.selectedHeadingSource.collectLatest { headingSource ->
+                    val locationSource = sensorRepository.selectedLocationSource.value
+                    kidNativeMapController.updateNavigationSource(
+                        locationSource = locationSource.name,
+                        headingSource = headingSource.name,
+                    )
+                }
+            }
+        }
+    }
+
     private fun observeNavigationInputStatus() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -1337,6 +1370,48 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun startNavigationInputPolling() {
+        navigationInputPoller.start(
+            candidateDirectories = navigationInputDirectories(),
+            onResult = { result ->
+                when (result.status) {
+                    InjectedNavigationInputImportStatus.IMPORTED -> {
+                        sensorRepository.updateInjectedNavigationInput(result.injectedInput)
+                        navigationInputStatusText = buildString {
+                            append(result.message)
+                            result.archivedFile?.let {
+                                append(" Archiv: ")
+                                append(it.absolutePath)
+                            }
+                        }
+                        Log.d(
+                            RESOLVER_LOG_TAG,
+                            "navigation-input-poller-imported source=${result.sourceFile?.absolutePath} archived=${result.archivedFile?.absolutePath} summary=${sensorRepository.getNavigationInputDebugSummary()}",
+                        )
+                        refreshReceivePanel()
+                    }
+                    InjectedNavigationInputImportStatus.IMPORT_FAILED -> {
+                        navigationInputStatusText = buildString {
+                            append(result.message)
+                            result.errors.firstOrNull()?.let {
+                                append(" ")
+                                append(it)
+                            }
+                        }
+                        Log.w(
+                            RESOLVER_LOG_TAG,
+                            "navigation-input-poller-failed source=${result.sourceFile?.absolutePath} archived=${result.archivedFile?.absolutePath} errors=${result.errors.joinToString(" | ")}",
+                        )
+                        refreshReceivePanel()
+                    }
+                    InjectedNavigationInputImportStatus.NO_FILE_FOUND -> {
+                        refreshReceivePanel()
+                    }
+                }
+            },
+        )
     }
 
     private fun syncNativeMapOrientation() {
