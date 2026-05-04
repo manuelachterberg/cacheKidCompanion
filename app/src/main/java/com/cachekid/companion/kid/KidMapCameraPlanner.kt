@@ -110,31 +110,21 @@ class KidMapCameraPlanner {
             )
         }
 
-        // Collect all route points (target + waypoints) and find the
-        // farthest one from the player so nothing disappears off-screen.
-        val routePoints = buildList {
-            add(LatLng(mission.target.latitude, mission.target.longitude))
-            mission.waypoints.forEach { add(LatLng(it.latitude, it.longitude)) }
-        }
-        val maxDistance = routePoints.maxOfOrNull { point ->
-            haversineDistance(
-                playerLocation.latitude, playerLocation.longitude,
-                point.latitude, point.longitude,
-            )
-        } ?: 0.0
+        val targetLocation = LatLng(mission.target.latitude, mission.target.longitude)
 
-        // Zoom so that the farthest route point stays visible.
-        val zoom = followZoomForDistance(maxDistance, viewport)
-
-        // Offset target forward so the player sits in the lower third.
-        val offsetMeters = followOffsetMeters(viewport, zoom)
-        val target = offsetLatLng(
+        val distanceMeters = haversineDistance(
             playerLocation.latitude, playerLocation.longitude,
-            bearing, offsetMeters,
+            targetLocation.latitude, targetLocation.longitude,
         )
 
+        // Zoom so that the target stays well inside the upper area while
+        // the player sits at the bottom edge (via padding in the controller).
+        // We want the player-to-target distance to fill only ~40 % of the
+        // visible height, leaving comfortable margin on both sides.
+        val zoom = followZoomForDistance(distanceMeters * 1.5, viewport)
+
         return CameraPlan(
-            target = target,
+            target = playerLocation,
             bearing = normalizeDegrees(bearing),
             zoom = zoom,
             tilt = 0.0,
@@ -156,16 +146,15 @@ class KidMapCameraPlanner {
     }
 
     /**
-     * Choose a zoom level so that [distanceMeters] fills roughly 60 % of the
-     * visible screen height, keeping the target in the upper area.
+     * Choose a zoom level so that [distanceMeters] fills roughly 70 % of the
+     * visible screen height.  Leaves enough head-room for the target in the
+     * upper area while the player sits in the lower third.
      */
     private fun followZoomForDistance(distanceMeters: Double, viewport: Viewport): Double {
         val visibleHeightPx = (viewport.heightPx - viewport.topPaddingPx - viewport.bottomPaddingPx)
             .coerceAtLeast(100)
-        // We want distanceMeters to be ~60 % of visible height in meters.
-        val desiredVisibleHeightMeters = distanceMeters / 0.6
-        // At zoom z: visibleHeightMeters = visibleHeightPx * EARTH_CIRCUMFERENCE / (256 * 2^z)
-        // Solve for z:
+        // We want distanceMeters to be ~70 % of visible height in meters.
+        val desiredVisibleHeightMeters = distanceMeters / 0.7
         val zoom = kotlin.math.ln(
             visibleHeightPx * EARTH_CIRCUMFERENCE_METERS / (256.0 * desiredVisibleHeightMeters)
         ) / kotlin.math.ln(2.0)

@@ -252,9 +252,10 @@ class KidNativeMapController(
         if (isCameraAnimating) return
         if (location == null) return
 
-        // Remove overview padding so the follow camera centres on the
-        // actual screen centre, not the inset area.
-        map.setPadding(0, 0, 0, 0)
+        // Push the player dot into the lower third by adding bottom padding.
+        // The camera target is the player, so padding shifts the viewport up.
+        val bottomPadding = (mapContainer.height * 0.30f).toInt().coerceAtLeast(100)
+        map.setPadding(0, 0, 0, bottomPadding)
 
         val plan = cameraPlanner.plan(
             mode = KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP,
@@ -268,9 +269,9 @@ class KidNativeMapController(
             viewport = KidMapCameraPlanner.Viewport(
                 widthPx = mapContainer.width.coerceAtLeast(1),
                 heightPx = mapContainer.height.coerceAtLeast(1),
-                topPaddingPx = ((viewportTopInsetPx ?: (mapContainer.height * 0.37f)) + (mapContainer.height * 0.02f)).toInt(),
-                bottomPaddingPx = ((viewportBottomInsetPx ?: (mapContainer.height * 0.14f)) + (mapContainer.height * 0.04f)).toInt(),
-                sidePaddingPx = (mapContainer.width * 0.10f).toInt().coerceAtLeast(40),
+                topPaddingPx = 0,
+                bottomPaddingPx = bottomPadding,
+                sidePaddingPx = 0,
             ),
         )
 

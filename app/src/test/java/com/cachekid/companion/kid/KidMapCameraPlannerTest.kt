@@ -72,7 +72,7 @@ class KidMapCameraPlannerTest {
     }
 
     @Test
-    fun `FOLLOW_HEADING_UP offsets target forward so player sits lower on screen`() {
+    fun `FOLLOW_HEADING_UP target is the player position`() {
         val playerLat = 52.515
         val playerLon = 13.400
         val heading = 45.0
@@ -89,16 +89,10 @@ class KidMapCameraPlannerTest {
             viewport = viewport,
         )
 
-        // Target must be shifted forward along the heading, not exactly on the player.
-        val distanceMeters = haversine(playerLat, playerLon, plan.target.latitude, plan.target.longitude)
-        assert(distanceMeters > 10.0) { "target should be offset from player, was $distanceMeters" }
-
-        // Target should lie roughly on the heading line from the player.
-        val bearingToTarget = KidMapCameraPlanner.bearingBetween(
-            playerLat, playerLon, plan.target.latitude, plan.target.longitude
-        )
-        assertEquals(heading, bearingToTarget, 2.0)
-
+        // Camera target must be exactly on the player (padding in the
+        // controller pushes the player dot into the lower third).
+        assertEquals(playerLat, plan.target.latitude, 0.00001)
+        assertEquals(playerLon, plan.target.longitude, 0.00001)
         assertEquals(heading, plan.bearing, 0.01)
         assertEquals(0.0, plan.tilt, 0.01)
     }
