@@ -92,7 +92,7 @@ class KidMapCameraPlanner {
         headingDegrees: Double?,
         viewport: Viewport,
     ): CameraPlan {
-        val target = if (location != null) {
+        val playerLocation = if (location != null) {
             LatLng(location.latitude, location.longitude)
         } else {
             LatLng(52.52, 13.405)
@@ -100,11 +100,58 @@ class KidMapCameraPlanner {
 
         val bearing = headingDegrees ?: 0.0
 
+        // Offset target in heading direction so the player appears in the
+        // lower portion of the screen instead of dead centre.
+        val target = if (location != null) {
+            val offsetMeters = followOffsetMeters(viewport)
+            offsetLatLng(playerLocation.latitude, playerLocation.longitude, bearing, offsetMeters)
+        } else {
+            playerLocation
+        }
+
         return CameraPlan(
             target = target,
             bearing = normalizeDegrees(bearing),
             zoom = FOLLOW_ZOOM,
             tilt = 0.0,
+        )
+    }
+
+    /**
+     * How many metres to shift the camera target forward along the heading
+     * so that the player dot sits in the lower third of the screen.
+     */
+    private fun followOffsetMeters(viewport: Viewport): Double {
+        val visibleHeightPx = (viewport.heightPx - viewport.topPaddingPx - viewport.bottomPaddingPx)
+            .coerceAtLeast(100)
+        // Place player roughly one-third up from the bottom -> offset is
+        // 1/6 of visible height below centre.
+        val offsetPx = visibleHeightPx / 6.0
+        // At zoom 18 one vertical pixel ≈ 0.6 m.
+        return offsetPx * METERS_PER_PIXEL_AT_ZOOM_18
+    }
+
+    /**
+     * Move a lat/lon point by [distanceMeters] along [bearingDegrees].
+     * Uses the small-angle approximation which is accurate to < 1 m for
+     * distances under a few hundred metres.
+     */
+    private fun offsetLatLng(
+        lat: Double,
+        lon: Double,
+        bearingDegrees: Double,
+        distanceMeters: Double,
+    ): LatLng {
+        val latRad = Math.toRadians(lat)
+        val bearingRad = Math.toRadians(bearingDegrees)
+
+        val latOffsetRad = distanceMeters * kotlin.math.cos(bearingRad) / EARTH_RADIUS_METERS
+        val lonOffsetRad = distanceMeters * kotlin.math.sin(bearingRad) /
+            (EARTH_RADIUS_METERS * kotlin.math.cos(latRad))
+
+        return LatLng(
+            lat + Math.toDegrees(latOffsetRad),
+            lon + Math.toDegrees(lonOffsetRad),
         )
     }
 
@@ -135,6 +182,8 @@ class KidMapCameraPlanner {
 
     companion object {
         const val FOLLOW_ZOOM = 18.0
+        private const val EARTH_RADIUS_METERS = 6_371_000.0
+        private const val METERS_PER_PIXEL_AT_ZOOM_18 = 0.6
 
         fun normalizeDegrees(value: Double): Double {
             var result = value % 360.0

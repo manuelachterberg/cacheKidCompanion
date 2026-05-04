@@ -252,6 +252,10 @@ class KidNativeMapController(
         if (isCameraAnimating) return
         if (location == null) return
 
+        // Remove overview padding so the follow camera centres on the
+        // actual screen centre, not the inset area.
+        map.setPadding(0, 0, 0, 0)
+
         val plan = cameraPlanner.plan(
             mode = KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP,
             location = KidMapCameraPlanner.LocationSnapshot(
