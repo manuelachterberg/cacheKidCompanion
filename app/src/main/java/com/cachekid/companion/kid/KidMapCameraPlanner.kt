@@ -61,7 +61,7 @@ class KidMapCameraPlanner {
     ): CameraPlan {
         return when (mode) {
             CameraMode.ROUTE_OVERVIEW -> planRouteOverview(location, headingDegrees, mission, viewport)
-            CameraMode.FOLLOW_HEADING_UP -> planFollowHeadingUp(location, headingDegrees, viewport)
+            CameraMode.FOLLOW_HEADING_UP -> planFollowHeadingUp(location, headingDegrees, mission, viewport)
         }
     }
 
@@ -90,6 +90,7 @@ class KidMapCameraPlanner {
     private fun planFollowHeadingUp(
         location: LocationSnapshot?,
         headingDegrees: Double?,
+        mission: ActiveMission?,
         viewport: Viewport,
     ): CameraPlan {
         val playerLocation = if (location != null) {
@@ -100,19 +101,42 @@ class KidMapCameraPlanner {
 
         val bearing = headingDegrees ?: 0.0
 
-        // Offset target in heading direction so the player appears in the
-        // lower portion of the screen instead of dead centre.
-        val target = if (location != null) {
-            val offsetMeters = followOffsetMeters(viewport)
-            offsetLatLng(playerLocation.latitude, playerLocation.longitude, bearing, offsetMeters)
-        } else {
-            playerLocation
+        if (location == null || mission == null) {
+            return CameraPlan(
+                target = playerLocation,
+                bearing = normalizeDegrees(bearing),
+                zoom = FOLLOW_ZOOM,
+                tilt = 0.0,
+            )
         }
+
+        // Collect all route points (target + waypoints) and find the
+        // farthest one from the player so nothing disappears off-screen.
+        val routePoints = buildList {
+            add(LatLng(mission.target.latitude, mission.target.longitude))
+            mission.waypoints.forEach { add(LatLng(it.latitude, it.longitude)) }
+        }
+        val maxDistance = routePoints.maxOfOrNull { point ->
+            haversineDistance(
+                playerLocation.latitude, playerLocation.longitude,
+                point.latitude, point.longitude,
+            )
+        } ?: 0.0
+
+        // Zoom so that the farthest route point stays visible.
+        val zoom = followZoomForDistance(maxDistance, viewport)
+
+        // Offset target forward so the player sits in the lower third.
+        val offsetMeters = followOffsetMeters(viewport, zoom)
+        val target = offsetLatLng(
+            playerLocation.latitude, playerLocation.longitude,
+            bearing, offsetMeters,
+        )
 
         return CameraPlan(
             target = target,
             bearing = normalizeDegrees(bearing),
-            zoom = FOLLOW_ZOOM,
+            zoom = zoom,
             tilt = 0.0,
         )
     }
@@ -121,14 +145,44 @@ class KidMapCameraPlanner {
      * How many metres to shift the camera target forward along the heading
      * so that the player dot sits in the lower third of the screen.
      */
-    private fun followOffsetMeters(viewport: Viewport): Double {
+    private fun followOffsetMeters(viewport: Viewport, zoom: Double): Double {
         val visibleHeightPx = (viewport.heightPx - viewport.topPaddingPx - viewport.bottomPaddingPx)
             .coerceAtLeast(100)
         // Place player roughly one-third up from the bottom -> offset is
         // 1/6 of visible height below centre.
         val offsetPx = visibleHeightPx / 6.0
-        // At zoom 18 one vertical pixel ≈ 0.6 m.
-        return offsetPx * METERS_PER_PIXEL_AT_ZOOM_18
+        val metersPerPixel = EARTH_CIRCUMFERENCE_METERS / (256.0 * pow2(zoom))
+        return offsetPx * metersPerPixel
+    }
+
+    /**
+     * Choose a zoom level so that [distanceMeters] fills roughly 60 % of the
+     * visible screen height, keeping the target in the upper area.
+     */
+    private fun followZoomForDistance(distanceMeters: Double, viewport: Viewport): Double {
+        val visibleHeightPx = (viewport.heightPx - viewport.topPaddingPx - viewport.bottomPaddingPx)
+            .coerceAtLeast(100)
+        // We want distanceMeters to be ~60 % of visible height in meters.
+        val desiredVisibleHeightMeters = distanceMeters / 0.6
+        // At zoom z: visibleHeightMeters = visibleHeightPx * EARTH_CIRCUMFERENCE / (256 * 2^z)
+        // Solve for z:
+        val zoom = kotlin.math.ln(
+            visibleHeightPx * EARTH_CIRCUMFERENCE_METERS / (256.0 * desiredVisibleHeightMeters)
+        ) / kotlin.math.ln(2.0)
+        return zoom.coerceIn(MIN_FOLLOW_ZOOM, MAX_FOLLOW_ZOOM)
+    }
+
+    private fun haversineDistance(
+        lat1: Double, lon1: Double,
+        lat2: Double, lon2: Double,
+    ): Double {
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
+            kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
+            kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
+        val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+        return EARTH_RADIUS_METERS * c
     }
 
     /**
@@ -183,7 +237,11 @@ class KidMapCameraPlanner {
     companion object {
         const val FOLLOW_ZOOM = 18.0
         private const val EARTH_RADIUS_METERS = 6_371_000.0
-        private const val METERS_PER_PIXEL_AT_ZOOM_18 = 0.6
+        private const val EARTH_CIRCUMFERENCE_METERS = 40_075_016.686
+        private const val MIN_FOLLOW_ZOOM = 14.5
+        private const val MAX_FOLLOW_ZOOM = 18.0
+
+        private fun pow2(zoom: Double): Double = kotlin.math.exp(zoom * kotlin.math.ln(2.0))
 
         fun normalizeDegrees(value: Double): Double {
             var result = value % 360.0
