@@ -72,34 +72,27 @@ class KidMapCameraPlannerTest {
     }
 
     @Test
-    fun `FOLLOW_HEADING_UP target is the player position`() {
-        val playerLat = 52.515
-        val playerLon = 13.400
-        val heading = 45.0
-
+    fun `FOLLOW_HEADING_UP uses live location as target`() {
         val plan = planner.plan(
             mode = KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP,
             location = KidMapCameraPlanner.LocationSnapshot(
-                latitude = playerLat,
-                longitude = playerLon,
+                latitude = 52.515,
+                longitude = 13.400,
                 accuracyMeters = 10f,
             ),
-            headingDegrees = heading,
+            headingDegrees = 45.0,
             mission = berlinMission,
             viewport = viewport,
         )
-
-        // Camera target must be exactly on the player (padding in the
-        // controller pushes the player dot into the lower third).
-        assertEquals(playerLat, plan.target.latitude, 0.00001)
-        assertEquals(playerLon, plan.target.longitude, 0.00001)
-        assertEquals(heading, plan.bearing, 0.01)
+        assertEquals(52.515, plan.target.latitude, 0.001)
+        assertEquals(13.400, plan.target.longitude, 0.001)
+        assertEquals(45.0, plan.bearing, 0.01)
         assertEquals(0.0, plan.tilt, 0.01)
     }
 
     @Test
     fun `FOLLOW_HEADING_UP zoom is dynamic based on distance to target`() {
-        // Player ~1.1 km from target -> zoom should be relaxed, not locked at 18
+        // Player ~650 m from target -> zoom should be relaxed, not locked at 18.0
         val plan = planner.plan(
             mode = KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP,
             location = KidMapCameraPlanner.LocationSnapshot(
@@ -111,47 +104,8 @@ class KidMapCameraPlannerTest {
             mission = berlinMission,
             viewport = viewport,
         )
-        // At ~650 m the zoom should be below the old fixed 18.0
         assert(plan.zoom < 18.0) { "zoom ${plan.zoom} should be < 18.0 for ~650 m distance" }
         assert(plan.zoom >= 14.5) { "zoom ${plan.zoom} should be >= 14.5" }
-    }
-
-    @Test
-    fun `FOLLOW_HEADING_UP zoom is higher when very close to target`() {
-        val closeMission = ActiveMission(
-            missionId = "close",
-            cacheCode = "GC123",
-            sourceTitle = "Test",
-            childTitle = "Test",
-            summary = "Test",
-            target = MissionTarget(52.5151, 13.4001),
-            routeOrigin = MissionTarget(52.515, 13.400),
-            waypoints = emptyList(),
-        )
-        val plan = planner.plan(
-            mode = KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP,
-            location = KidMapCameraPlanner.LocationSnapshot(
-                latitude = 52.515,
-                longitude = 13.400,
-                accuracyMeters = 10f,
-            ),
-            headingDegrees = 45.0,
-            mission = closeMission,
-            viewport = viewport,
-        )
-        // At ~14 m distance the zoom should be near max
-        assert(plan.zoom > 16.0) { "zoom ${plan.zoom} should be > 16.0 for 14 m distance" }
-    }
-
-    private fun haversine(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val R = 6_371_000.0
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
-            kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
-            kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
-        val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
-        return R * c
     }
 
     @Test

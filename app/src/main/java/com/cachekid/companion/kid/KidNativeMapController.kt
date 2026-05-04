@@ -99,6 +99,8 @@ class KidNativeMapController(
     private var cameraMode = KidMapCameraPlanner.CameraMode.ROUTE_OVERVIEW
     private var isCameraAnimating = false
     private var cameraModeToggleView: ImageView? = null
+    private val arrivalImageView: ImageView
+    private var isArrivalShowing = false
 
     init {
         MapLibre.getInstance(context.applicationContext)
@@ -157,6 +159,19 @@ class KidNativeMapController(
         overlayContainer.addView(cameraModeToggleView)
         cameraModeToggleView?.bringToFront()
         updateCameraModeToggleIcon()
+
+        // Arrival overlay (cacheClose.png) – fullscreen, hidden by default
+        arrivalImageView = ImageView(context).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            )
+            visibility = View.GONE
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setImageBitmap(loadBitmapFromAssets(context, "web/cacheClose.png"))
+        }
+        overlayContainer.addView(arrivalImageView)
+        arrivalImageView.bringToFront()
     }
 
     fun onCreate(savedInstanceState: android.os.Bundle?) {
@@ -236,6 +251,7 @@ class KidNativeMapController(
             "updateLocation raw=${location?.latitude},${location?.longitude} accuracy=${location?.accuracy} bearing=${location?.bearing}",
         )
         updateMissionOverlays()
+        checkArrival()
 
         if (cameraMode == KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP) {
             applyFollowCamera(location)
@@ -247,15 +263,27 @@ class KidNativeMapController(
         }
     }
 
+    private fun checkArrival() {
+        val location = currentLocation ?: return
+        val mission = currentMission ?: return
+        val player = LatLng(location.latitude, location.longitude)
+        val target = LatLng(mission.target.latitude, mission.target.longitude)
+        val distance = distanceMeters(player, target)
+        val hasArrived = distance <= 5.0
+        if (hasArrived && !isArrivalShowing) {
+            isArrivalShowing = true
+            arrivalImageView.visibility = View.VISIBLE
+            arrivalImageView.bringToFront()
+        } else if (!hasArrived && isArrivalShowing) {
+            isArrivalShowing = false
+            arrivalImageView.visibility = View.GONE
+        }
+    }
+
     private fun applyFollowCamera(location: Location?) {
         val map = mapLibreMap ?: return
         if (isCameraAnimating) return
         if (location == null) return
-
-        // Push the player dot into the lower third by adding bottom padding.
-        // The camera target is the player, so padding shifts the viewport up.
-        val bottomPadding = (mapContainer.height * 0.30f).toInt().coerceAtLeast(100)
-        map.setPadding(0, 0, 0, bottomPadding)
 
         val plan = cameraPlanner.plan(
             mode = KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP,
@@ -269,9 +297,9 @@ class KidNativeMapController(
             viewport = KidMapCameraPlanner.Viewport(
                 widthPx = mapContainer.width.coerceAtLeast(1),
                 heightPx = mapContainer.height.coerceAtLeast(1),
-                topPaddingPx = 0,
-                bottomPaddingPx = bottomPadding,
-                sidePaddingPx = 0,
+                topPaddingPx = ((viewportTopInsetPx ?: (mapContainer.height * 0.37f)) + (mapContainer.height * 0.02f)).toInt(),
+                bottomPaddingPx = ((viewportBottomInsetPx ?: (mapContainer.height * 0.14f)) + (mapContainer.height * 0.04f)).toInt(),
+                sidePaddingPx = (mapContainer.width * 0.10f).toInt().coerceAtLeast(40),
             ),
         )
 
@@ -1323,6 +1351,14 @@ class KidNativeMapController(
         val x = kotlin.math.cos(startLat) * kotlin.math.sin(endLat) -
             kotlin.math.sin(startLat) * kotlin.math.cos(endLat) * kotlin.math.cos(deltaLon)
         return (Math.toDegrees(kotlin.math.atan2(y, x)) + 360.0) % 360.0
+    }
+
+    private fun loadBitmapFromAssets(context: Context, path: String): android.graphics.Bitmap? {
+        return runCatching {
+            context.assets.open(path).use { stream ->
+                android.graphics.BitmapFactory.decodeStream(stream)
+            }
+        }.getOrNull()
     }
 
     private fun normalizeDegrees(value: Double): Double {

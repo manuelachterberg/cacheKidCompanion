@@ -111,17 +111,11 @@ class KidMapCameraPlanner {
         }
 
         val targetLocation = LatLng(mission.target.latitude, mission.target.longitude)
-
         val distanceMeters = haversineDistance(
             playerLocation.latitude, playerLocation.longitude,
             targetLocation.latitude, targetLocation.longitude,
         )
-
-        // Zoom so that the target stays well inside the upper area while
-        // the player sits at the bottom edge (via padding in the controller).
-        // We want the player-to-target distance to fill only ~40 % of the
-        // visible height, leaving comfortable margin on both sides.
-        val zoom = followZoomForDistance(distanceMeters * 1.5, viewport)
+        val zoom = followZoomForDistance(distanceMeters, viewport)
 
         return CameraPlan(
             target = playerLocation,
@@ -129,36 +123,6 @@ class KidMapCameraPlanner {
             zoom = zoom,
             tilt = 0.0,
         )
-    }
-
-    /**
-     * How many metres to shift the camera target forward along the heading
-     * so that the player dot sits in the lower third of the screen.
-     */
-    private fun followOffsetMeters(viewport: Viewport, zoom: Double): Double {
-        val visibleHeightPx = (viewport.heightPx - viewport.topPaddingPx - viewport.bottomPaddingPx)
-            .coerceAtLeast(100)
-        // Place player roughly one-third up from the bottom -> offset is
-        // 1/6 of visible height below centre.
-        val offsetPx = visibleHeightPx / 6.0
-        val metersPerPixel = EARTH_CIRCUMFERENCE_METERS / (256.0 * pow2(zoom))
-        return offsetPx * metersPerPixel
-    }
-
-    /**
-     * Choose a zoom level so that [distanceMeters] fills roughly 70 % of the
-     * visible screen height.  Leaves enough head-room for the target in the
-     * upper area while the player sits in the lower third.
-     */
-    private fun followZoomForDistance(distanceMeters: Double, viewport: Viewport): Double {
-        val visibleHeightPx = (viewport.heightPx - viewport.topPaddingPx - viewport.bottomPaddingPx)
-            .coerceAtLeast(100)
-        // We want distanceMeters to be ~70 % of visible height in meters.
-        val desiredVisibleHeightMeters = distanceMeters / 0.7
-        val zoom = kotlin.math.ln(
-            visibleHeightPx * EARTH_CIRCUMFERENCE_METERS / (256.0 * desiredVisibleHeightMeters)
-        ) / kotlin.math.ln(2.0)
-        return zoom.coerceIn(MIN_FOLLOW_ZOOM, MAX_FOLLOW_ZOOM)
     }
 
     private fun haversineDistance(
@@ -174,28 +138,14 @@ class KidMapCameraPlanner {
         return EARTH_RADIUS_METERS * c
     }
 
-    /**
-     * Move a lat/lon point by [distanceMeters] along [bearingDegrees].
-     * Uses the small-angle approximation which is accurate to < 1 m for
-     * distances under a few hundred metres.
-     */
-    private fun offsetLatLng(
-        lat: Double,
-        lon: Double,
-        bearingDegrees: Double,
-        distanceMeters: Double,
-    ): LatLng {
-        val latRad = Math.toRadians(lat)
-        val bearingRad = Math.toRadians(bearingDegrees)
-
-        val latOffsetRad = distanceMeters * kotlin.math.cos(bearingRad) / EARTH_RADIUS_METERS
-        val lonOffsetRad = distanceMeters * kotlin.math.sin(bearingRad) /
-            (EARTH_RADIUS_METERS * kotlin.math.cos(latRad))
-
-        return LatLng(
-            lat + Math.toDegrees(latOffsetRad),
-            lon + Math.toDegrees(lonOffsetRad),
-        )
+    private fun followZoomForDistance(distanceMeters: Double, viewport: Viewport): Double {
+        val visibleHeightPx = (viewport.heightPx - viewport.topPaddingPx - viewport.bottomPaddingPx)
+            .coerceAtLeast(100)
+        val desiredVisibleHeightMeters = distanceMeters / 0.7
+        val zoom = kotlin.math.ln(
+            visibleHeightPx * EARTH_CIRCUMFERENCE_METERS / (256.0 * desiredVisibleHeightMeters)
+        ) / kotlin.math.ln(2.0)
+        return zoom.coerceIn(MIN_FOLLOW_ZOOM, MAX_FOLLOW_ZOOM)
     }
 
     private fun courseBearing(
@@ -229,8 +179,6 @@ class KidMapCameraPlanner {
         private const val EARTH_CIRCUMFERENCE_METERS = 40_075_016.686
         private const val MIN_FOLLOW_ZOOM = 14.5
         private const val MAX_FOLLOW_ZOOM = 18.0
-
-        private fun pow2(zoom: Double): Double = kotlin.math.exp(zoom * kotlin.math.ln(2.0))
 
         fun normalizeDegrees(value: Double): Double {
             var result = value % 360.0
