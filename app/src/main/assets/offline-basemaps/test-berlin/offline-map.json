@@ -1,0 +1,17 @@
+{
+  "id": "test-berlin",
+  "displayName": "Test Berlin",
+  "version": "2.1.0",
+  "format": "pmtiles-vector",
+  "tileAssetPath": "map.pmtiles",
+  "styleAssetPath": "style.json",
+  "minZoom": 10,
+  "maxZoom": 16,
+  "attribution": "OpenStreetMap contributors",
+  "bounds": {
+    "minLatitude": 52.488800000000005,
+    "minLongitude": 13.366,
+    "maxLatitude": 52.551199999999994,
+    "maxLongitude": 13.444
+  }
+}

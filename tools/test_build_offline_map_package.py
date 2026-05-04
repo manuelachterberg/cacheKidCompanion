@@ -74,6 +74,33 @@ class OfflineMapPackageBuilderTest(unittest.TestCase):
             self.assertTrue(pmtiles.startswith(b"PMTiles\x03"))
             self.assertGreater(len(pmtiles), 127)
 
+    def test_style_uses_e_ink_optimized_colours(self) -> None:
+        """Roads must be dark on a light background for E-ink readability."""
+        style = json.loads(builder.build_style_json(min_zoom=10, max_zoom=16))
+        layers = {layer["id"]: layer for layer in style["layers"]}
+
+        # Background should be white (best E-ink reflectivity)
+        self.assertEqual("#ffffff", layers["background"]["paint"]["background-color"])
+
+        # Roads must not be white or near-white on E-ink
+        minor_colour = layers["road-minor"]["paint"]["line-color"]
+        major_colour = layers["road-major"]["paint"]["line-color"]
+        self.assertNotEqual("#ffffff", minor_colour)
+        self.assertNotEqual("#f2f0e8", major_colour)
+
+        # Sanity: colours should be dark greys
+        self.assertTrue(minor_colour.startswith("#7") or minor_colour.startswith("#6") or minor_colour.startswith("#5"))
+        self.assertTrue(major_colour.startswith("#4") or major_colour.startswith("#3") or major_colour.startswith("#2") or major_colour.startswith("#1"))
+
+        # Opacity should be full (partial transparency washes out on E-ink)
+        self.assertEqual(1.0, layers["road-minor"]["paint"]["line-opacity"])
+        self.assertEqual(1.0, layers["road-major"]["paint"]["line-opacity"])
+
+        # Surface layers must be visible on E-ink (not too close to white)
+        self.assertNotEqual("#ffffff", layers["water-fill"]["paint"]["fill-color"])
+        self.assertNotEqual("#ffffff", layers["building-fill"]["paint"]["fill-color"])
+        self.assertNotEqual("#ffffff", layers["park-fill"]["paint"]["fill-color"])
+
 
 if __name__ == "__main__":
     unittest.main()

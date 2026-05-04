@@ -1,0 +1,128 @@
+{
+  "version": 8,
+  "name": "CacheKid Local Offline Map",
+  "sources": {
+    "cachekid-offline-basemap-source": {
+      "type": "vector",
+      "url": "pmtiles://cachekid-local-map",
+      "minzoom": 10,
+      "maxzoom": 16,
+      "attribution": "OpenStreetMap contributors"
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#ffffff"
+      }
+    },
+    {
+      "id": "landuse-residential",
+      "type": "fill",
+      "source": "cachekid-offline-basemap-source",
+      "source-layer": "landuse",
+      "filter": [
+        "==",
+        [
+          "get",
+          "class"
+        ],
+        "residential"
+      ],
+      "paint": {
+        "fill-color": "#f2f2f2",
+        "fill-opacity": 1.0
+      }
+    },
+    {
+      "id": "park-fill",
+      "type": "fill",
+      "source": "cachekid-offline-basemap-source",
+      "source-layer": "park",
+      "paint": {
+        "fill-color": "#e8e8e8",
+        "fill-opacity": 1.0
+      }
+    },
+    {
+      "id": "land-forest",
+      "type": "fill",
+      "source": "cachekid-offline-basemap-source",
+      "source-layer": "land",
+      "paint": {
+        "fill-color": "#e0e0e0",
+        "fill-opacity": 1.0
+      }
+    },
+    {
+      "id": "building-fill",
+      "type": "fill",
+      "source": "cachekid-offline-basemap-source",
+      "source-layer": "building",
+      "paint": {
+        "fill-color": "#dddddd",
+        "fill-opacity": 1.0
+      }
+    },
+    {
+      "id": "water-fill",
+      "type": "fill",
+      "source": "cachekid-offline-basemap-source",
+      "source-layer": "water",
+      "paint": {
+        "fill-color": "#cccccc",
+        "fill-opacity": 1.0
+      }
+    },
+    {
+      "id": "water-line",
+      "type": "line",
+      "source": "cachekid-offline-basemap-source",
+      "source-layer": "water",
+      "paint": {
+        "line-color": "#999999",
+        "line-width": 1.5
+      }
+    },
+    {
+      "id": "road-minor",
+      "type": "line",
+      "source": "cachekid-offline-basemap-source",
+      "source-layer": "roads",
+      "filter": [
+        "==",
+        [
+          "get",
+          "class"
+        ],
+        "minor"
+      ],
+      "paint": {
+        "line-color": "#777777",
+        "line-width": 1.4,
+        "line-opacity": 1.0
+      }
+    },
+    {
+      "id": "road-major",
+      "type": "line",
+      "source": "cachekid-offline-basemap-source",
+      "source-layer": "roads",
+      "filter": [
+        "==",
+        [
+          "get",
+          "class"
+        ],
+        "major"
+      ],
+      "paint": {
+        "line-color": "#444444",
+        "line-width": 2.2,
+        "line-opacity": 1.0
+      }
+    }
+  ]
+}
