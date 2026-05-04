@@ -114,13 +114,19 @@ def parse_args() -> argparse.Namespace:
 
 def fetch_overpass(bounds: Bounds, endpoint: str) -> dict[str, Any]:
     query = f"""
-        [out:json][timeout:35];
+        [out:json][timeout:60];
         (
           way["highway"]({bounds.min_latitude},{bounds.min_longitude},{bounds.max_latitude},{bounds.max_longitude});
           way["waterway"]({bounds.min_latitude},{bounds.min_longitude},{bounds.max_latitude},{bounds.max_longitude});
           way["natural"="water"]({bounds.min_latitude},{bounds.min_longitude},{bounds.max_latitude},{bounds.max_longitude});
+          relation["natural"="water"]({bounds.min_latitude},{bounds.min_longitude},{bounds.max_latitude},{bounds.max_longitude});
           way["landuse"="forest"]({bounds.min_latitude},{bounds.min_longitude},{bounds.max_latitude},{bounds.max_longitude});
           way["natural"="wood"]({bounds.min_latitude},{bounds.min_longitude},{bounds.max_latitude},{bounds.max_longitude});
+          way["building"]({bounds.min_latitude},{bounds.min_longitude},{bounds.max_latitude},{bounds.max_longitude});
+          way["leisure"="park"]({bounds.min_latitude},{bounds.min_longitude},{bounds.max_latitude},{bounds.max_longitude});
+          way["leisure"="grass"]({bounds.min_latitude},{bounds.min_longitude},{bounds.max_latitude},{bounds.max_longitude});
+          way["natural"="grassland"]({bounds.min_latitude},{bounds.min_longitude},{bounds.max_latitude},{bounds.max_longitude});
+          way["landuse"="residential"]({bounds.min_latitude},{bounds.min_longitude},{bounds.max_latitude},{bounds.max_longitude});
         );
         out tags geom;
     """
@@ -156,7 +162,8 @@ def extract_features(map_data: dict[str, Any]) -> list[RenderFeature]:
         if layer is None:
             continue
 
-        if layer in {"water", "land"} and len(points) >= 4 and points[0] == points[-1]:
+        polygon_layers = {"water", "land", "building", "park", "landuse"}
+        if layer in polygon_layers and len(points) >= 4 and points[0] == points[-1]:
             shape = Polygon(points)
             if not shape.is_valid:
                 shape = shape.buffer(0)
@@ -185,6 +192,12 @@ def classify_layer(tags: dict[str, Any]) -> str | None:
         return "water"
     if tags.get("landuse") == "forest" or tags.get("natural") == "wood":
         return "land"
+    if tags.get("building"):
+        return "building"
+    if tags.get("leisure") in {"park", "grass"} or tags.get("natural") == "grassland":
+        return "park"
+    if tags.get("landuse") == "residential":
+        return "landuse"
     if tags.get("highway"):
         return "roads"
     return None
@@ -202,6 +215,12 @@ def classify_class(tags: dict[str, Any]) -> str:
         return "water"
     if tags.get("landuse") == "forest" or tags.get("natural") == "wood":
         return "forest"
+    if tags.get("building"):
+        return "building"
+    if tags.get("leisure") in {"park", "grass"} or tags.get("natural") == "grassland":
+        return "park"
+    if tags.get("landuse") == "residential":
+        return "residential"
     return "other"
 
 
@@ -282,6 +301,9 @@ def write_vector_pmtiles(
                     {"id": "land", "description": "Forest and wooded areas", "fields": {"class": "String"}},
                     {"id": "water", "description": "Water bodies and waterways", "fields": {"class": "String"}},
                     {"id": "roads", "description": "Road and path network", "fields": {"class": "String"}},
+                    {"id": "building", "description": "Buildings", "fields": {"class": "String"}},
+                    {"id": "park", "description": "Parks and grassland", "fields": {"class": "String"}},
+                    {"id": "landuse", "description": "Landuse areas", "fields": {"class": "String"}},
                 ],
             },
         )
@@ -292,7 +314,7 @@ def encode_tile(features: list[RenderFeature], zoom: int, tile_x: int, tile_y: i
     tile_box = box(west, south, east, north)
     layers: list[dict[str, Any]] = []
 
-    for layer_name in ("land", "water", "roads"):
+    for layer_name in ("land", "water", "roads", "building", "park", "landuse"):
         layer_features = []
         for feature in features:
             if feature.layer != layer_name or not feature.geometry.intersects(tile_box):
@@ -361,6 +383,12 @@ def build_manifest(
 
 
 def build_style_json(min_zoom: int, max_zoom: int) -> str:
+    """Build an E-ink optimized MapLibre style JSON.
+
+    Colours are chosen for high contrast on reflective (E-ink) displays where
+    mid-tone greys can appear muddy.  Roads use dark greys on a white
+    background so they remain readable in bright daylight without backlight.
+    """
     return json.dumps(
         {
             "version": 8,
@@ -378,28 +406,50 @@ def build_style_json(min_zoom: int, max_zoom: int) -> str:
                 {
                     "id": "background",
                     "type": "background",
-                    "paint": {"background-color": "#f4f2ea"},
+                    "paint": {"background-color": "#ffffff"},
+                },
+                {
+                    "id": "landuse-residential",
+                    "type": "fill",
+                    "source": "cachekid-offline-basemap-source",
+                    "source-layer": "landuse",
+                    "filter": ["==", ["get", "class"], "residential"],
+                    "paint": {"fill-color": "#f2f2f2", "fill-opacity": 1.0},
+                },
+                {
+                    "id": "park-fill",
+                    "type": "fill",
+                    "source": "cachekid-offline-basemap-source",
+                    "source-layer": "park",
+                    "paint": {"fill-color": "#e8e8e8", "fill-opacity": 1.0},
                 },
                 {
                     "id": "land-forest",
                     "type": "fill",
                     "source": "cachekid-offline-basemap-source",
                     "source-layer": "land",
-                    "paint": {"fill-color": "#d8ddcb", "fill-opacity": 0.78},
+                    "paint": {"fill-color": "#e0e0e0", "fill-opacity": 1.0},
+                },
+                {
+                    "id": "building-fill",
+                    "type": "fill",
+                    "source": "cachekid-offline-basemap-source",
+                    "source-layer": "building",
+                    "paint": {"fill-color": "#dddddd", "fill-opacity": 1.0},
                 },
                 {
                     "id": "water-fill",
                     "type": "fill",
                     "source": "cachekid-offline-basemap-source",
                     "source-layer": "water",
-                    "paint": {"fill-color": "#d4dde0", "fill-opacity": 0.86},
+                    "paint": {"fill-color": "#cccccc", "fill-opacity": 1.0},
                 },
                 {
                     "id": "water-line",
                     "type": "line",
                     "source": "cachekid-offline-basemap-source",
                     "source-layer": "water",
-                    "paint": {"line-color": "#c5d0d4", "line-width": 1.5},
+                    "paint": {"line-color": "#999999", "line-width": 1.5},
                 },
                 {
                     "id": "road-minor",
@@ -407,7 +457,7 @@ def build_style_json(min_zoom: int, max_zoom: int) -> str:
                     "source": "cachekid-offline-basemap-source",
                     "source-layer": "roads",
                     "filter": ["==", ["get", "class"], "minor"],
-                    "paint": {"line-color": "#ffffff", "line-width": 1.1, "line-opacity": 0.9},
+                    "paint": {"line-color": "#777777", "line-width": 1.4, "line-opacity": 1.0},
                 },
                 {
                     "id": "road-major",
@@ -415,7 +465,7 @@ def build_style_json(min_zoom: int, max_zoom: int) -> str:
                     "source": "cachekid-offline-basemap-source",
                     "source-layer": "roads",
                     "filter": ["==", ["get", "class"], "major"],
-                    "paint": {"line-color": "#f2f0e8", "line-width": 2.0, "line-opacity": 0.95},
+                    "paint": {"line-color": "#444444", "line-width": 2.2, "line-opacity": 1.0},
                 },
             ],
         },
