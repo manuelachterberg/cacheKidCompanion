@@ -391,8 +391,7 @@ class KidNativeMapController(
             map.moveCamera(update)
             maximizeZoomForVisibleEndpoints(
                 map = map,
-                routeStart = routeStart,
-                missionTarget = missionTarget,
+                routePoints = routePoints,
                 width = width,
                 height = height,
                 topPadding = topPadding,
@@ -869,8 +868,7 @@ class KidNativeMapController(
 
     private fun maximizeZoomForVisibleEndpoints(
         map: MapLibreMap,
-        routeStart: LatLng,
-        missionTarget: LatLng,
+        routePoints: List<LatLng>,
         width: Int,
         height: Int,
         topPadding: Int,
@@ -895,17 +893,13 @@ class KidNativeMapController(
                 .build()
             map.moveCamera(CameraUpdateFactory.newCameraPosition(candidateCamera))
 
-            val originPoint = map.projection.toScreenLocation(routeStart)
-            val targetPoint = map.projection.toScreenLocation(missionTarget)
-            val fits =
-                originPoint.x >= left + safetyInset &&
-                    originPoint.x <= right - safetyInset &&
-                    originPoint.y >= top + safetyInset &&
-                    originPoint.y <= bottom - safetyInset &&
-                    targetPoint.x >= left + safetyInset &&
-                    targetPoint.x <= right - safetyInset &&
-                    targetPoint.y >= top + safetyInset &&
-                    targetPoint.y <= bottom - safetyInset
+            val fits = routePoints.all { point ->
+                val screenPoint = map.projection.toScreenLocation(point)
+                screenPoint.x >= left + safetyInset &&
+                    screenPoint.x <= right - safetyInset &&
+                    screenPoint.y >= top + safetyInset &&
+                    screenPoint.y <= bottom - safetyInset
+            }
 
             if (!fits) {
                 map.moveCamera(CameraUpdateFactory.newCameraPosition(currentCamera))
