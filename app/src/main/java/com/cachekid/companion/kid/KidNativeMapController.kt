@@ -95,6 +95,12 @@ class KidNativeMapController(
     private var viewportBottomInsetPx: Float? = null
     private var lastZoneFitUsedStrict = true
     private val sourceIndicatorView: ImageView
+    private val cameraPlanner = KidMapCameraPlanner()
+    private var cameraMode = KidMapCameraPlanner.CameraMode.ROUTE_OVERVIEW
+    private var isCameraAnimating = false
+    private var cameraModeToggleView: ImageView? = null
+    private val arrivalImageView: ImageView
+    private var isArrivalShowing = false
 
     init {
         MapLibre.getInstance(context.applicationContext)
@@ -134,6 +140,38 @@ class KidNativeMapController(
         }
         overlayContainer.addView(sourceIndicatorView)
         sourceIndicatorView.bringToFront()
+
+        // Camera mode toggle button (bottom-start, opposite the source indicator)
+        cameraModeToggleView = ImageView(context).apply {
+            layoutParams = FrameLayout.LayoutParams(cardSizePx, cardSizePx).apply {
+                gravity = android.view.Gravity.BOTTOM or android.view.Gravity.START
+                bottomMargin = marginPx
+                leftMargin = marginPx
+            }
+            setBackgroundColor(Color.parseColor("#FFFDF8"))
+            elevation = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, 8f, context.resources.displayMetrics,
+            )
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            visibility = View.GONE
+            setOnClickListener { toggleCameraMode() }
+        }
+        overlayContainer.addView(cameraModeToggleView)
+        cameraModeToggleView?.bringToFront()
+        updateCameraModeToggleIcon()
+
+        // Arrival overlay (cacheClose.png) – fullscreen, hidden by default
+        arrivalImageView = ImageView(context).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            )
+            visibility = View.GONE
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setImageBitmap(loadBitmapFromAssets(context, "web/cacheClose.png"))
+        }
+        overlayContainer.addView(arrivalImageView)
+        arrivalImageView.bringToFront()
     }
 
     fun onCreate(savedInstanceState: android.os.Bundle?) {
@@ -194,6 +232,7 @@ class KidNativeMapController(
         }
         mapContainer.visibility = if (mission != null) View.VISIBLE else View.GONE
         sourceIndicatorView.visibility = if (mission != null) View.VISIBLE else View.GONE
+        cameraModeToggleView?.visibility = if (mission != null) View.VISIBLE else View.GONE
         if (missionChanged || mission == null) {
             applyStyleForMission(mapLibreMap ?: return, mission)
         } else {
@@ -212,10 +251,75 @@ class KidNativeMapController(
             "updateLocation raw=${location?.latitude},${location?.longitude} accuracy=${location?.accuracy} bearing=${location?.bearing}",
         )
         updateMissionOverlays()
-        applyOrientationBearing()
-        val map = mapLibreMap ?: return
+        checkArrival()
+
+        if (cameraMode == KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP) {
+            applyFollowCamera(location)
+        } else {
+            applyOrientationBearing()
+            val map = mapLibreMap ?: return
+            val mission = currentMission ?: return
+            refitZoomForCurrentBearing(map, mission)
+        }
+    }
+
+    private fun checkArrival() {
+        val location = currentLocation ?: return
         val mission = currentMission ?: return
-        refitZoomForCurrentBearing(map, mission)
+        val player = LatLng(location.latitude, location.longitude)
+        val target = LatLng(mission.target.latitude, mission.target.longitude)
+        val distance = distanceMeters(player, target)
+        val hasArrived = distance <= 5.0
+        if (hasArrived && !isArrivalShowing) {
+            isArrivalShowing = true
+            arrivalImageView.visibility = View.VISIBLE
+            arrivalImageView.bringToFront()
+        } else if (!hasArrived && isArrivalShowing) {
+            isArrivalShowing = false
+            arrivalImageView.visibility = View.GONE
+        }
+    }
+
+    private fun applyFollowCamera(location: Location?) {
+        val map = mapLibreMap ?: return
+        if (isCameraAnimating) return
+        if (location == null) return
+
+        val plan = cameraPlanner.plan(
+            mode = KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP,
+            location = KidMapCameraPlanner.LocationSnapshot(
+                latitude = location.latitude,
+                longitude = location.longitude,
+                accuracyMeters = location.accuracy,
+            ),
+            headingDegrees = currentHeadingDegrees?.toDouble(),
+            mission = currentMission,
+            viewport = KidMapCameraPlanner.Viewport(
+                widthPx = mapContainer.width.coerceAtLeast(1),
+                heightPx = mapContainer.height.coerceAtLeast(1),
+                topPaddingPx = ((viewportTopInsetPx ?: (mapContainer.height * 0.37f)) + (mapContainer.height * 0.02f)).toInt(),
+                bottomPaddingPx = ((viewportBottomInsetPx ?: (mapContainer.height * 0.14f)) + (mapContainer.height * 0.04f)).toInt(),
+                sidePaddingPx = (mapContainer.width * 0.10f).toInt().coerceAtLeast(40),
+            ),
+        )
+
+        isCameraAnimating = true
+        val cameraUpdate = CameraUpdateFactory.newCameraPosition(
+            CameraPosition.Builder()
+                .target(LatLng(plan.target.latitude, plan.target.longitude))
+                .bearing(plan.bearing)
+                .zoom(plan.zoom)
+                .tilt(plan.tilt)
+                .build(),
+        )
+        map.animateCamera(cameraUpdate, 150, object : MapLibreMap.CancelableCallback {
+            override fun onCancel() {
+                isCameraAnimating = false
+            }
+            override fun onFinish() {
+                isCameraAnimating = false
+            }
+        })
     }
 
     fun updateHeading(headingDegrees: Float?) {
@@ -379,8 +483,17 @@ class KidNativeMapController(
             val bottomPadding = ((viewportBottomInsetPx ?: (height * 0.14f)) + (height * 0.04f)).toInt()
             Log.d(
                 CAMERA_LOG_TAG,
-                "updateCamera routeBounds points=${routePoints.size} top=$topPadding bottom=$bottomPadding side=$sidePadding",
+                "updateCamera routeBounds points=${routePoints.size} top=$topPadding bottom=$bottomPadding side=$sidePadding mode=$cameraMode",
             )
+
+            if (cameraMode == KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP) {
+                val location = currentLocation
+                if (location != null) {
+                    applyFollowCamera(location)
+                    return
+                }
+            }
+
             val update = CameraUpdateFactory.newLatLngBounds(
                 routeBounds,
                 sidePadding,
@@ -822,7 +935,9 @@ class KidNativeMapController(
         map.moveCamera(CameraUpdateFactory.newCameraPosition(updatedCamera))
         lastAppliedBearingDegrees = normalizedDesired
         lastOrientationCommitAtMillis = now
-        refitZoomForCurrentBearing(map, mission)
+        if (cameraMode != KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP) {
+            refitZoomForCurrentBearing(map, mission)
+        }
     }
 
     private fun resolveNavigationBearing(mission: ActiveMission): Double? {
@@ -1238,6 +1353,14 @@ class KidNativeMapController(
         return (Math.toDegrees(kotlin.math.atan2(y, x)) + 360.0) % 360.0
     }
 
+    private fun loadBitmapFromAssets(context: Context, path: String): android.graphics.Bitmap? {
+        return runCatching {
+            context.assets.open(path).use { stream ->
+                android.graphics.BitmapFactory.decodeStream(stream)
+            }
+        }.getOrNull()
+    }
+
     private fun normalizeDegrees(value: Double): Double {
         return ((value % 360.0) + 360.0) % 360.0
     }
@@ -1331,4 +1454,86 @@ class KidNativeMapController(
         val playerPoint: LatLng,
         val remainingWaypoints: List<com.cachekid.companion.host.mission.MissionWaypoint>,
     )
+
+    //region Camera mode
+
+    fun setCameraMode(mode: KidMapCameraPlanner.CameraMode) {
+        if (cameraMode == mode) return
+        cameraMode = mode
+        updateCameraModeToggleIcon()
+        updateCamera(animate = true)
+    }
+
+    private fun toggleCameraMode() {
+        val newMode = when (cameraMode) {
+            KidMapCameraPlanner.CameraMode.ROUTE_OVERVIEW -> KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP
+            KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP -> KidMapCameraPlanner.CameraMode.ROUTE_OVERVIEW
+        }
+        setCameraMode(newMode)
+    }
+
+    private fun updateCameraModeToggleIcon() {
+        val toggle = cameraModeToggleView ?: return
+        val bitmap = when (cameraMode) {
+            KidMapCameraPlanner.CameraMode.ROUTE_OVERVIEW -> buildOverviewIconBitmap()
+            KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP -> buildFollowIconBitmap()
+        }
+        toggle.setImageBitmap(bitmap)
+    }
+
+    private fun buildOverviewIconBitmap(): Bitmap {
+        val bitmap = Bitmap.createBitmap(120, 120, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 14f
+        }
+        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.STROKE
+            strokeWidth = 10f
+        }
+        // Map rectangle
+        canvas.drawRect(24f, 24f, 96f, 96f, halo)
+        canvas.drawRect(24f, 24f, 96f, 96f, ink)
+        // Crosshair
+        canvas.drawLine(60f, 34f, 60f, 86f, ink)
+        canvas.drawLine(34f, 60f, 86f, 60f, ink)
+        return bitmap
+    }
+
+    private fun buildFollowIconBitmap(): Bitmap {
+        val bitmap = Bitmap.createBitmap(120, 120, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 14f
+        }
+        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.STROKE
+            strokeWidth = 10f
+        }
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.FILL
+        }
+        // Triangle pointing up
+        val path = Path().apply {
+            moveTo(60f, 20f)
+            lineTo(100f, 100f)
+            lineTo(20f, 100f)
+            close()
+        }
+        canvas.drawPath(path, halo)
+        canvas.drawPath(path, ink)
+        canvas.drawPath(path, fill)
+        // White dot in center
+        canvas.drawCircle(60f, 70f, 14f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE })
+        return bitmap
+    }
+
+    //endregion
 }
