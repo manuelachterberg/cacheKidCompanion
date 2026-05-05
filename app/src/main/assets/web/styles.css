@@ -92,12 +92,12 @@ body.native-map-mode .kid-mission {
   line-height: 1;
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: var(--ink);
-  -webkit-text-stroke: 6px rgba(255, 255, 255, 0.96);
-  paint-order: stroke fill;
-  text-shadow:
-    0 0 1px rgba(255, 255, 255, 0.98),
-    0 0 8px rgba(255, 255, 255, 0.9);
+  color: #000000;
+  background: #ffffff;
+  padding: 8px 22px;
+  border-radius: 999px;
+  border: 3px solid #000000;
+  display: inline-block;
 }
 
 .kid-distance-scale {

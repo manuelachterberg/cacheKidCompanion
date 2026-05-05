@@ -23,6 +23,8 @@
       missionId: null,
       startDistanceMeters: null,
     },
+    locationTimestamp: null,
+    lastKnownDistanceMeters: null,
     importStatus: null,
     shareDebug: null,
   };
@@ -162,15 +164,20 @@
   }
 
   function renderKidCompass(distanceMeters) {
-    if (typeof distanceMeters === "number") {
+    const now = Date.now();
+    const locationAgeMs = state.locationTimestamp ? now - state.locationTimestamp : Infinity;
+    const hasFreshLocation = locationAgeMs < 10000;
+
+    if (typeof distanceMeters === "number" && hasFreshLocation) {
       ui.kidDistanceValue.textContent = `${Math.round(distanceMeters)} m`;
+      state.lastKnownDistanceMeters = distanceMeters;
       const startDistance = state.missionRuntime.startDistanceMeters || distanceMeters;
       const progress = startDistance > 0
         ? Math.max(0, Math.min(1, 1 - (distanceMeters / startDistance)))
         : 0;
       ui.kidDistanceScaleFill.style.width = `${Math.max(6, Math.round(progress * 100))}%`;
     } else {
-      ui.kidDistanceValue.textContent = "--";
+      ui.kidDistanceValue.textContent = "?";
       ui.kidDistanceScaleFill.style.width = "0%";
     }
 
@@ -330,6 +337,7 @@
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         };
+        state.locationTimestamp = Date.now();
         state.sourceLabel = state.hasNativeHost ? "Browser GPS + Native Sensoren" : "Browser GPS";
         setStatus("Browser-GPS aktiv.");
         render();
@@ -463,6 +471,7 @@
         latitude: payload.latitude,
         longitude: payload.longitude,
       };
+      state.locationTimestamp = Date.now();
       state.sourceLabel = typeof state.headingDegrees === "number" ? "Native Sensor + GPS" : "Native GPS";
       render();
       return;
