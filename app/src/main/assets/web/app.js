@@ -177,7 +177,7 @@
         : 0;
       ui.kidDistanceScaleFill.style.width = `${Math.max(6, Math.round(progress * 100))}%`;
     } else {
-      ui.kidDistanceValue.textContent = "Suche Signal…";
+      ui.kidDistanceValue.textContent = "?";
       ui.kidDistanceScaleFill.style.width = "0%";
     }
 
