@@ -83,24 +83,17 @@ class KidNativeMapController(
     private var currentMission: ActiveMission? = null
     private var currentLocation: Location? = null
     private var currentHeadingDegrees: Float? = null
-    private var previousCourseLocation: Location? = null
-    private var currentCourseBearingDegrees: Double? = null
     private var lastAppliedBearingDegrees: Double? = null
-    private var lastOrientationCommitAtMillis: Long = 0L
     private var displayedMissionId: String? = null
     private var displayedRouteStart: LatLng? = null
     private var displayedStyleKey: String? = null
     private var lastCameraDebugInfo: CameraDebugInfo? = null
     private var viewportTopInsetPx: Float? = null
     private var viewportBottomInsetPx: Float? = null
-    private var lastZoneFitUsedStrict = true
     private val sourceIndicatorView: ImageView
     private val cameraPlanner = KidMapCameraPlanner()
-    private var cameraMode = KidMapCameraPlanner.CameraMode.ROUTE_OVERVIEW
-    private var isCameraAnimating = false
-    private var cameraModeToggleView: ImageView? = null
-    private val arrivalImageView: ImageView
-    private var isArrivalShowing = false
+    private var currentCameraMode: CameraMode = CameraMode.ROUTE_OVERVIEW
+    private lateinit var cameraModeToggleView: android.widget.TextView
 
     init {
         MapLibre.getInstance(context.applicationContext)
@@ -141,37 +134,30 @@ class KidNativeMapController(
         overlayContainer.addView(sourceIndicatorView)
         sourceIndicatorView.bringToFront()
 
-        // Camera mode toggle button (bottom-start, opposite the source indicator)
-        cameraModeToggleView = ImageView(context).apply {
-            layoutParams = FrameLayout.LayoutParams(cardSizePx, cardSizePx).apply {
+        val toggleSizePx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, 48f, context.resources.displayMetrics,
+        ).toInt()
+        val toggleMarginPx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, 12f, context.resources.displayMetrics,
+        ).toInt()
+        cameraModeToggleView = android.widget.TextView(context).apply {
+            layoutParams = FrameLayout.LayoutParams(toggleSizePx, toggleSizePx).apply {
                 gravity = android.view.Gravity.BOTTOM or android.view.Gravity.START
-                bottomMargin = marginPx
-                leftMargin = marginPx
+                bottomMargin = toggleMarginPx
+                leftMargin = toggleMarginPx
             }
-            setBackgroundColor(Color.parseColor("#FFFDF8"))
+            text = "O"
+            textSize = 20f
+            setTextColor(Color.BLACK)
+            gravity = android.view.Gravity.CENTER
+            setBackgroundColor(Color.WHITE)
             elevation = TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_DIP, 8f, context.resources.displayMetrics,
+                TypedValue.COMPLEX_UNIT_DIP, 4f, context.resources.displayMetrics,
             )
-            scaleType = ImageView.ScaleType.CENTER_INSIDE
-            visibility = View.GONE
             setOnClickListener { toggleCameraMode() }
         }
         overlayContainer.addView(cameraModeToggleView)
-        cameraModeToggleView?.bringToFront()
-        updateCameraModeToggleIcon()
-
-        // Arrival overlay (cacheClose.png) – fullscreen, hidden by default
-        arrivalImageView = ImageView(context).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-            )
-            visibility = View.GONE
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            setImageBitmap(loadBitmapFromAssets(context, "web/cacheClose.png"))
-        }
-        overlayContainer.addView(arrivalImageView)
-        arrivalImageView.bringToFront()
+        cameraModeToggleView.bringToFront()
     }
 
     fun onCreate(savedInstanceState: android.os.Bundle?) {
@@ -215,24 +201,16 @@ class KidNativeMapController(
         currentLocation = location
         if (mission == null) {
             lastAppliedBearingDegrees = null
-            lastOrientationCommitAtMillis = 0L
             displayedMissionId = null
             displayedRouteStart = null
             displayedStyleKey = null
-            previousCourseLocation = null
-            currentCourseBearingDegrees = null
         } else if (missionChanged || displayedMissionId != mission.missionId || displayedRouteStart == null) {
             lastAppliedBearingDegrees = null
-            lastOrientationCommitAtMillis = 0L
             displayedMissionId = mission.missionId
             displayedRouteStart = resolveDisplayRouteStart(mission)
-            previousCourseLocation = null
-            currentCourseBearingDegrees = null
-            lastZoneFitUsedStrict = true
         }
         mapContainer.visibility = if (mission != null) View.VISIBLE else View.GONE
         sourceIndicatorView.visibility = if (mission != null) View.VISIBLE else View.GONE
-        cameraModeToggleView?.visibility = if (mission != null) View.VISIBLE else View.GONE
         if (missionChanged || mission == null) {
             applyStyleForMission(mapLibreMap ?: return, mission)
         } else {
@@ -244,87 +222,20 @@ class KidNativeMapController(
     }
 
     fun updateLocation(location: Location?) {
-        updateCourseBearing(location)
         currentLocation = location
         Log.d(
             CAMERA_LOG_TAG,
             "updateLocation raw=${location?.latitude},${location?.longitude} accuracy=${location?.accuracy} bearing=${location?.bearing}",
         )
         updateMissionOverlays()
-        checkArrival()
-
-        if (cameraMode == KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP) {
-            applyFollowCamera(location)
-        } else {
-            applyOrientationBearing()
-            val map = mapLibreMap ?: return
-            val mission = currentMission ?: return
-            refitZoomForCurrentBearing(map, mission)
-        }
-    }
-
-    private fun checkArrival() {
-        val location = currentLocation ?: return
-        val mission = currentMission ?: return
-        val player = LatLng(location.latitude, location.longitude)
-        val target = LatLng(mission.target.latitude, mission.target.longitude)
-        val distance = distanceMeters(player, target)
-        val hasArrived = distance <= 5.0
-        if (hasArrived && !isArrivalShowing) {
-            isArrivalShowing = true
-            arrivalImageView.visibility = View.VISIBLE
-            arrivalImageView.bringToFront()
-        } else if (!hasArrived && isArrivalShowing) {
-            isArrivalShowing = false
-            arrivalImageView.visibility = View.GONE
-        }
-    }
-
-    private fun applyFollowCamera(location: Location?) {
-        val map = mapLibreMap ?: return
-        if (isCameraAnimating) return
-        if (location == null) return
-
-        val plan = cameraPlanner.plan(
-            mode = KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP,
-            location = KidMapCameraPlanner.LocationSnapshot(
-                latitude = location.latitude,
-                longitude = location.longitude,
-                accuracyMeters = location.accuracy,
-            ),
-            headingDegrees = currentHeadingDegrees?.toDouble(),
-            mission = currentMission,
-            viewport = KidMapCameraPlanner.Viewport(
-                widthPx = mapContainer.width.coerceAtLeast(1),
-                heightPx = mapContainer.height.coerceAtLeast(1),
-                topPaddingPx = ((viewportTopInsetPx ?: (mapContainer.height * 0.37f)) + (mapContainer.height * 0.02f)).toInt(),
-                bottomPaddingPx = ((viewportBottomInsetPx ?: (mapContainer.height * 0.14f)) + (mapContainer.height * 0.04f)).toInt(),
-                sidePaddingPx = (mapContainer.width * 0.10f).toInt().coerceAtLeast(40),
-            ),
-        )
-
-        isCameraAnimating = true
-        val cameraUpdate = CameraUpdateFactory.newCameraPosition(
-            CameraPosition.Builder()
-                .target(LatLng(plan.target.latitude, plan.target.longitude))
-                .bearing(plan.bearing)
-                .zoom(plan.zoom)
-                .tilt(plan.tilt)
-                .build(),
-        )
-        map.animateCamera(cameraUpdate, 150, object : MapLibreMap.CancelableCallback {
-            override fun onCancel() {
-                isCameraAnimating = false
-            }
-            override fun onFinish() {
-                isCameraAnimating = false
-            }
-        })
+        updateCameraFromPlan(animate = true)
     }
 
     fun updateHeading(headingDegrees: Float?) {
         currentHeadingDegrees = headingDegrees
-        applyOrientationBearing()
+        if (currentCameraMode == CameraMode.FOLLOW_HEADING_UP) {
+            updateCameraFromPlan(animate = true)
+        }
     }
 
     fun updateNavigationSource(locationSource: String, headingSource: String) {
@@ -422,7 +333,7 @@ class KidNativeMapController(
     fun getLastCameraDebugInfo(): CameraDebugInfo? = lastCameraDebugInfo
 
     fun getCurrentMapBearingDegrees(): Double? =
-        mapLibreMap?.cameraPosition?.bearing?.let { normalizeDegrees(it) } ?: lastAppliedBearingDegrees
+        mapLibreMap?.cameraPosition?.bearing?.let { cameraPlanner.normalizeDegrees(it) } ?: lastAppliedBearingDegrees
 
     fun getCurrentTargetBearingDegrees(): Double? = currentMission?.let { routeBearingForMission(it) }
 
@@ -431,102 +342,127 @@ class KidNativeMapController(
         viewportBottomInsetPx = bottomInsetPx
     }
 
-    private fun updateCamera(animate: Boolean = false) {
-        val map = mapLibreMap ?: return
-        if (!mapStyleLoaded) {
-            Log.d(CAMERA_LOG_TAG, "updateCamera skipped mapStyleLoaded=false")
-            return
+    fun toggleCameraMode() {
+        currentCameraMode = when (currentCameraMode) {
+            CameraMode.ROUTE_OVERVIEW -> CameraMode.FOLLOW_HEADING_UP
+            CameraMode.FOLLOW_HEADING_UP -> CameraMode.ROUTE_OVERVIEW
         }
+        cameraModeToggleView.text = when (currentCameraMode) {
+            CameraMode.ROUTE_OVERVIEW -> "O"
+            CameraMode.FOLLOW_HEADING_UP -> "F"
+        }
+        Log.d(CAMERA_LOG_TAG, "toggleCameraMode -> $currentCameraMode")
+        updateCameraFromPlan(animate = true)
+    }
 
+    private fun updateCamera(animate: Boolean = false) {
+        updateCameraFromPlan(animate)
+    }
+
+    private fun currentViewport(): Viewport {
         val width = mapContainer.width
         val height = mapContainer.height
-        var availableMapHeightPx = 0
-        if (width > 0 && height > 0) {
-            val topPadding = (viewportTopInsetPx ?: (height * 0.37f)).toInt()
-            val sidePadding = (width * 0.08f).toInt()
-            val bottomPadding = (viewportBottomInsetPx ?: (height * 0.14f)).toInt()
-            map.setPadding(sidePadding, topPadding, sidePadding, bottomPadding)
-            availableMapHeightPx = (height - topPadding - bottomPadding).coerceAtLeast(1)
-        }
-
-        val mission = currentMission ?: return
-        val missionTarget = LatLng(mission.target.latitude, mission.target.longitude)
-        val fallbackRouteStart = displayedRouteStart ?: resolveDisplayRouteStart(mission).also {
-            displayedRouteStart = it
-        }
-        val activeRoute = resolveActiveRouteState(mission, fallbackRouteStart)
-        val routeStart = activeRoute.routeStart
-        val routePoints = buildList {
-            add(routeStart)
-            activeRoute.remainingWaypoints.forEach { waypoint ->
-                add(LatLng(waypoint.latitude, waypoint.longitude))
-            }
-            add(missionTarget)
-        }
-        Log.d(
-            CAMERA_LOG_TAG,
-            "updateCamera mission=${mission.missionId} animate=$animate routeStart=${routeStart.latitude},${routeStart.longitude} target=${missionTarget.latitude},${missionTarget.longitude} routePoints=${routePoints.size}",
+        val topPadding = (viewportTopInsetPx ?: (height * 0.37f)).toInt()
+        val bottomPadding = (viewportBottomInsetPx ?: (height * 0.14f)).toInt()
+        val sidePadding = (width * 0.08f).toInt()
+        return Viewport(
+            widthPx = width,
+            heightPx = height,
+            topPaddingPx = topPadding,
+            bottomPaddingPx = bottomPadding,
+            leftPaddingPx = sidePadding,
+            rightPaddingPx = sidePadding,
         )
-        val useFallback = !looksLikeCentralEurope(missionTarget)
-        val cameraTarget = if (useFallback) germanyFallback else missionTarget
-        lastCameraDebugInfo = CameraDebugInfo(
-            latitude = cameraTarget.latitude,
-            longitude = cameraTarget.longitude,
-            usedFallback = useFallback,
-            missionTargetLatitude = missionTarget.latitude,
-            missionTargetLongitude = missionTarget.longitude,
-        )
-        val routeBounds = buildRouteBounds(routePoints)
-        if (routeBounds != null && width > 0 && height > 0) {
-            val sidePadding = (width * 0.10f).toInt().coerceAtLeast(40)
-            val topPadding = ((viewportTopInsetPx ?: (height * 0.37f)) + (height * 0.02f)).toInt()
-            val bottomPadding = ((viewportBottomInsetPx ?: (height * 0.14f)) + (height * 0.04f)).toInt()
-            Log.d(
-                CAMERA_LOG_TAG,
-                "updateCamera routeBounds points=${routePoints.size} top=$topPadding bottom=$bottomPadding side=$sidePadding mode=$cameraMode",
-            )
+    }
 
-            if (cameraMode == KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP) {
-                val location = currentLocation
-                if (location != null) {
-                    applyFollowCamera(location)
-                    return
-                }
-            }
-
-            val update = CameraUpdateFactory.newLatLngBounds(
-                routeBounds,
-                sidePadding,
-                topPadding,
-                sidePadding,
-                bottomPadding,
-            )
-            map.moveCamera(update)
-            maximizeZoomForVisibleEndpoints(
-                map = map,
-                routePoints = routePoints,
-                width = width,
-                height = height,
-                topPadding = topPadding,
-                bottomPadding = bottomPadding,
-                sidePadding = sidePadding,
-            )
-            applyOrientationBearing()
+    private fun updateCameraFromPlan(animate: Boolean = true) {
+        val map = mapLibreMap ?: return
+        if (!mapStyleLoaded) {
+            Log.d(CAMERA_LOG_TAG, "updateCameraFromPlan skipped mapStyleLoaded=false")
             return
         }
 
-        val fallbackCamera = CameraPosition.Builder()
-            .target(cameraTarget)
-            .zoom(16.2)
-            .tilt(20.0)
-            .build()
+        val mission = currentMission
+        if (mission == null) {
+            Log.d(CAMERA_LOG_TAG, "updateCameraFromPlan skipped no mission")
+            return
+        }
+
+        val location = currentLocation?.let { LocationSnapshot(it.latitude, it.longitude) }
+        val heading = currentHeadingDegrees?.toDouble()
+        val viewport = currentViewport()
+
+        val plan = cameraPlanner.plan(currentCameraMode, location, heading, mission, viewport)
+
+        // Respektiere Auto-Switch aus dem Planner (z.B. Follow → Overview bei großer Distanz)
+        if (plan.mode != currentCameraMode) {
+            currentCameraMode = plan.mode
+            cameraModeToggleView.text = when (plan.mode) {
+                CameraMode.ROUTE_OVERVIEW -> "O"
+                CameraMode.FOLLOW_HEADING_UP -> "F"
+            }
+            Log.d(CAMERA_LOG_TAG, "Planner auto-switched to ${plan.mode}")
+        }
+
+        val update = when {
+            plan.bounds != null -> {
+                map.setPadding(
+                    viewport.leftPaddingPx,
+                    viewport.topPaddingPx,
+                    viewport.rightPaddingPx,
+                    viewport.bottomPaddingPx,
+                )
+                CameraUpdateFactory.newLatLngBounds(
+                    plan.bounds,
+                    viewport.leftPaddingPx,
+                    viewport.topPaddingPx,
+                    viewport.rightPaddingPx,
+                    viewport.bottomPaddingPx,
+                )
+            }
+            plan.target != null && plan.zoom != null -> {
+                map.setPadding(0, 0, 0, 0)
+                CameraUpdateFactory.newCameraPosition(
+                    CameraPosition.Builder()
+                        .target(plan.target)
+                        .zoom(plan.zoom)
+                        .bearing(plan.bearing)
+                        .tilt(plan.tilt)
+                        .build()
+                )
+            }
+            else -> {
+                Log.d(CAMERA_LOG_TAG, "updateCameraFromPlan empty plan")
+                return
+            }
+        }
+
         Log.d(
             CAMERA_LOG_TAG,
-            "updateCamera fallback bearing=${fallbackCamera.bearing} zoom=${fallbackCamera.zoom} target=${fallbackCamera.target?.latitude},${fallbackCamera.target?.longitude}",
+            "updateCameraFromPlan mode=${plan.mode} bearing=${plan.bearing} zoom=${plan.zoom} animate=$animate",
         )
-        val update = CameraUpdateFactory.newCameraPosition(fallbackCamera)
-        map.moveCamera(update)
-        applyOrientationBearing()
+
+        if (animate) {
+            map.animateCamera(update)
+        } else {
+            map.moveCamera(update)
+        }
+        logScreenPositions()
+
+        lastAppliedBearingDegrees = plan.bearing
+    }
+
+    private fun logScreenPositions() {
+        val map = mapLibreMap ?: return
+        val mission = currentMission ?: return
+        val playerLatLng = resolveDisplayRouteStart(mission)
+        val targetLatLng = LatLng(mission.target.latitude, mission.target.longitude)
+        val playerScreen = map.projection.toScreenLocation(playerLatLng)
+        val targetScreen = map.projection.toScreenLocation(targetLatLng)
+        Log.d(
+            CAMERA_LOG_TAG,
+            "screen player=${playerScreen.x},${playerScreen.y} target=${targetScreen.x},${targetScreen.y} width=${mapContainer.width} height=${mapContainer.height}",
+        )
     }
 
     private fun updateMissionOverlays() {
@@ -837,7 +773,7 @@ class KidNativeMapController(
         if (!looksLikeCentralEurope(routeStart) || !looksLikeCentralEurope(missionTarget)) {
             return null
         }
-        return bearingBetween(routeStart, missionTarget)
+        return cameraPlanner.bearingBetween(routeStart, missionTarget)
     }
 
     private fun resolveDisplayRouteStart(mission: ActiveMission): LatLng {
@@ -912,458 +848,6 @@ class KidNativeMapController(
         )
     }
 
-    private fun applyOrientationBearing() {
-        val map = mapLibreMap ?: return
-        val mission = currentMission ?: return
-        val desiredBearing = resolveNavigationBearing(mission) ?: return
-        val currentCamera = map.cameraPosition
-        val currentBearing = normalizeDegrees(currentCamera.bearing)
-        val normalizedDesired = normalizeDegrees(desiredBearing)
-        val delta = smallestAngleDifference(currentBearing, normalizedDesired)
-        val now = SystemClock.elapsedRealtime()
-        val elapsedSinceCommit = now - lastOrientationCommitAtMillis
-        if (kotlin.math.abs(delta) < 4.5) {
-            lastAppliedBearingDegrees = currentBearing
-            return
-        }
-        if (elapsedSinceCommit < 320L && kotlin.math.abs(delta) < 12.0) {
-            return
-        }
-        val updatedCamera = CameraPosition.Builder(currentCamera)
-            .bearing(normalizedDesired)
-            .build()
-        map.moveCamera(CameraUpdateFactory.newCameraPosition(updatedCamera))
-        lastAppliedBearingDegrees = normalizedDesired
-        lastOrientationCommitAtMillis = now
-        if (cameraMode != KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP) {
-            refitZoomForCurrentBearing(map, mission)
-        }
-    }
-
-    private fun resolveNavigationBearing(mission: ActiveMission): Double? {
-        val headingBearing = currentHeadingDegrees
-            ?.takeIf { it.isFinite() }
-            ?.toDouble()
-            ?.let(::normalizeDegrees)
-        if (headingBearing != null) {
-            return headingBearing
-        }
-
-        val courseBearing = currentCourseBearingDegrees?.let(::normalizeDegrees)
-        if (courseBearing != null) {
-            return courseBearing
-        }
-
-        return routeBearingForMission(mission)?.let(::normalizeDegrees)
-    }
-
-    private fun updateCourseBearing(location: Location?) {
-        if (location == null) {
-            return
-        }
-        val previous = previousCourseLocation
-        previousCourseLocation = location
-        if (previous == null) {
-            return
-        }
-        val previousLatLng = LatLng(previous.latitude, previous.longitude)
-        val currentLatLng = LatLng(location.latitude, location.longitude)
-        if (distanceMeters(previousLatLng, currentLatLng) < 8.0) {
-            return
-        }
-        currentCourseBearingDegrees = bearingBetween(previousLatLng, currentLatLng)
-    }
-
-    private fun smallestAngleDifference(from: Double, to: Double): Double {
-        var delta = (to - from) % 360.0
-        if (delta > 180.0) delta -= 360.0
-        if (delta < -180.0) delta += 360.0
-        return delta
-    }
-
-    private fun maximizeZoomForVisibleEndpoints(
-        map: MapLibreMap,
-        routePoints: List<LatLng>,
-        width: Int,
-        height: Int,
-        topPadding: Int,
-        bottomPadding: Int,
-        sidePadding: Int,
-    ) {
-        val left = sidePadding.toFloat()
-        val top = topPadding.toFloat()
-        val right = (width - sidePadding).toFloat()
-        val bottom = (height - bottomPadding).toFloat()
-        val safetyInset = 12f
-
-        repeat(14) {
-            val currentCamera = map.cameraPosition
-            val candidateZoom = (currentCamera.zoom + 0.30).coerceAtMost(19.2)
-            if (candidateZoom <= currentCamera.zoom + 0.01) {
-                return
-            }
-
-            val candidateCamera = CameraPosition.Builder(currentCamera)
-                .zoom(candidateZoom)
-                .build()
-            map.moveCamera(CameraUpdateFactory.newCameraPosition(candidateCamera))
-
-            val fits = routePoints.all { point ->
-                val screenPoint = map.projection.toScreenLocation(point)
-                screenPoint.x >= left + safetyInset &&
-                    screenPoint.x <= right - safetyInset &&
-                    screenPoint.y >= top + safetyInset &&
-                    screenPoint.y <= bottom - safetyInset
-            }
-
-            if (!fits) {
-                map.moveCamera(CameraUpdateFactory.newCameraPosition(currentCamera))
-                return
-            }
-        }
-    }
-
-    private fun refitZoomForCurrentBearing(
-        map: MapLibreMap,
-        mission: ActiveMission,
-    ) {
-        val width = mapContainer.width
-        val height = mapContainer.height
-        if (width <= 0 || height <= 0) {
-            return
-        }
-
-        val routeStart = displayedRouteStart ?: resolveDisplayRouteStart(mission).also {
-            displayedRouteStart = it
-        }
-        val missionTarget = LatLng(mission.target.latitude, mission.target.longitude)
-        val activeRoute = resolveActiveRouteState(mission, routeStart)
-        val livePlayer = activeRoute.playerPoint
-        val activeRoutePoints = buildList {
-            add(activeRoute.routeStart)
-            activeRoute.remainingWaypoints.forEach { waypoint ->
-                add(LatLng(waypoint.latitude, waypoint.longitude))
-            }
-            add(missionTarget)
-        }
-        val sidePadding = (width * 0.10f).toInt().coerceAtLeast(40)
-        val topPadding = ((viewportTopInsetPx ?: (height * 0.37f)) + (height * 0.02f)).toInt()
-        val bottomPadding = ((viewportBottomInsetPx ?: (height * 0.14f)) + (height * 0.04f)).toInt()
-        solveRouteCameraForCurrentBearing(
-            map = map,
-            routeStart = livePlayer,
-            missionTarget = missionTarget,
-            activeRoutePoints = activeRoutePoints,
-            width = width,
-            height = height,
-            topPadding = topPadding,
-            bottomPadding = bottomPadding,
-            sidePadding = sidePadding,
-        )
-    }
-
-    private fun solveRouteCameraForCurrentBearing(
-        map: MapLibreMap,
-        routeStart: LatLng,
-        missionTarget: LatLng,
-        activeRoutePoints: List<LatLng>,
-        width: Int,
-        height: Int,
-        topPadding: Int,
-        bottomPadding: Int,
-        sidePadding: Int,
-    ) {
-        if (activeRoutePoints.size < 2) return
-        val availableHeight = (height - topPadding - bottomPadding).coerceAtLeast(1)
-        val targetZoneMaxY = topPadding + (availableHeight * 0.10f)
-        val originZoneMinY = height - bottomPadding - 14f
-        val left = sidePadding.toFloat()
-        val top = topPadding.toFloat()
-        val right = (width - sidePadding).toFloat()
-        val bottom = (height - bottomPadding).toFloat()
-        val safetyInset = 12f
-        val anchorX = (left + right) / 2f
-        val anchorY = (top + bottom) / 2f
-        val previousCamera = map.cameraPosition
-        val routeCenter = computeRouteCenter(activeRoutePoints)
-        val baseCamera = CameraPosition.Builder(map.cameraPosition)
-            .target(routeCenter)
-            .build()
-        map.moveCamera(CameraUpdateFactory.newCameraPosition(baseCamera))
-
-        val strictCamera = maximizeCameraUnderConstraints(
-            map = map,
-            baseCamera = baseCamera,
-            routeStart = routeStart,
-            missionTarget = missionTarget,
-            activeRoutePoints = activeRoutePoints,
-            left = left,
-            top = top,
-            right = right,
-            bottom = bottom,
-            safetyInset = safetyInset,
-            originZoneMinY = originZoneMinY,
-            targetZoneMaxY = targetZoneMaxY,
-            desiredCenterX = width / 2f,
-            desiredCenterY = anchorY,
-            anchorX = anchorX,
-            anchorY = anchorY,
-            requireZones = true,
-            zoneTolerancePx = if (lastZoneFitUsedStrict) 40f else -28f,
-        )
-        val currentCameraVisible = cameraSatisfiesConstraints(
-            map = map,
-            candidate = previousCamera,
-            routeStart = routeStart,
-            missionTarget = missionTarget,
-            activeRoutePoints = activeRoutePoints,
-            left = left,
-            top = top,
-            right = right,
-            bottom = bottom,
-            safetyInset = safetyInset,
-            originZoneMinY = originZoneMinY,
-            targetZoneMaxY = targetZoneMaxY,
-            requireZones = false,
-            zoneTolerancePx = 0f,
-        )
-        val visibilityCamera = maximizeCameraUnderConstraints(
-            map = map,
-            baseCamera = baseCamera,
-            routeStart = routeStart,
-            missionTarget = missionTarget,
-            activeRoutePoints = activeRoutePoints,
-            left = left,
-            top = top,
-            right = right,
-            bottom = bottom,
-            safetyInset = safetyInset,
-            originZoneMinY = originZoneMinY,
-            targetZoneMaxY = targetZoneMaxY,
-            desiredCenterX = width / 2f,
-            desiredCenterY = anchorY,
-            anchorX = anchorX,
-            anchorY = anchorY,
-            requireZones = false,
-            zoneTolerancePx = 0f,
-            minZoom = if (currentCameraVisible) {
-                previousCamera.zoom.coerceIn(8.5, 19.2)
-            } else {
-                8.5
-            },
-            maxZoom = if (currentCameraVisible) {
-                19.2
-            } else {
-                previousCamera.zoom.coerceIn(8.5, 19.2)
-            },
-        )
-        val finalCamera = strictCamera ?: visibilityCamera ?: previousCamera ?: baseCamera
-        lastZoneFitUsedStrict = strictCamera != null
-        map.moveCamera(CameraUpdateFactory.newCameraPosition(finalCamera))
-
-        val finalOrigin = map.projection.toScreenLocation(routeStart)
-        val finalTarget = map.projection.toScreenLocation(missionTarget)
-        Log.d(
-            CAMERA_LOG_TAG,
-            "zone-fit originY=${finalOrigin.y} targetY=${finalTarget.y} originMinY=$originZoneMinY targetMaxY=$targetZoneMaxY top=$topPadding bottom=$bottomPadding height=$height zoom=${map.cameraPosition.zoom} bearing=${map.cameraPosition.bearing}",
-        )
-    }
-
-    private fun maximizeCameraUnderConstraints(
-        map: MapLibreMap,
-        baseCamera: CameraPosition,
-        routeStart: LatLng,
-        missionTarget: LatLng,
-        activeRoutePoints: List<LatLng>,
-        left: Float,
-        top: Float,
-        right: Float,
-        bottom: Float,
-        safetyInset: Float,
-        originZoneMinY: Float,
-        targetZoneMaxY: Float,
-        desiredCenterX: Float,
-        desiredCenterY: Float,
-        anchorX: Float,
-        anchorY: Float,
-        requireZones: Boolean,
-        zoneTolerancePx: Float,
-        minZoom: Double = 8.5,
-        maxZoom: Double = 19.2,
-    ): CameraPosition? {
-        var low = minZoom.coerceIn(8.5, 19.2)
-        var high = maxZoom
-        var bestCamera: CameraPosition? = null
-
-        if (high < low) {
-            return null
-        }
-
-        repeat(18) {
-            val candidateZoom = (low + high) / 2.0
-            val candidate = buildConstrainedCamera(
-                map = map,
-                baseCamera = baseCamera,
-                zoom = candidateZoom,
-                routeStart = routeStart,
-                missionTarget = missionTarget,
-                originZoneMinY = originZoneMinY,
-                targetZoneMaxY = targetZoneMaxY,
-                desiredCenterX = desiredCenterX,
-                desiredCenterY = desiredCenterY,
-                anchorX = anchorX,
-                anchorY = anchorY,
-                requireZones = requireZones,
-            )
-            val candidateValid = cameraSatisfiesConstraints(
-                map = map,
-                candidate = candidate,
-                routeStart = routeStart,
-                missionTarget = missionTarget,
-                activeRoutePoints = activeRoutePoints,
-                left = left,
-                top = top,
-                right = right,
-                bottom = bottom,
-                safetyInset = safetyInset,
-                originZoneMinY = originZoneMinY,
-                targetZoneMaxY = targetZoneMaxY,
-                requireZones = requireZones,
-                zoneTolerancePx = zoneTolerancePx,
-            )
-
-            if (candidateValid) {
-                bestCamera = candidate
-                low = candidateZoom
-            } else {
-                high = candidateZoom
-            }
-        }
-
-        return bestCamera
-    }
-
-    private fun cameraSatisfiesConstraints(
-        map: MapLibreMap,
-        candidate: CameraPosition,
-        routeStart: LatLng,
-        missionTarget: LatLng,
-        activeRoutePoints: List<LatLng>,
-        left: Float,
-        top: Float,
-        right: Float,
-        bottom: Float,
-        safetyInset: Float,
-        originZoneMinY: Float,
-        targetZoneMaxY: Float,
-        requireZones: Boolean,
-        zoneTolerancePx: Float,
-    ): Boolean {
-        map.moveCamera(CameraUpdateFactory.newCameraPosition(candidate))
-
-        val originPoint = map.projection.toScreenLocation(routeStart)
-        val targetPoint = map.projection.toScreenLocation(missionTarget)
-        val routeVisible = activeRoutePoints.all { point ->
-            val screenPoint = map.projection.toScreenLocation(point)
-            screenPoint.x >= left + safetyInset &&
-                screenPoint.x <= right - safetyInset &&
-                screenPoint.y >= top + safetyInset &&
-                screenPoint.y <= bottom - safetyInset
-        }
-        val endpointsVisible =
-            originPoint.x >= left + safetyInset &&
-                originPoint.x <= right - safetyInset &&
-                originPoint.y >= top + safetyInset &&
-                originPoint.y <= bottom - safetyInset &&
-                targetPoint.x >= left + safetyInset &&
-                targetPoint.x <= right - safetyInset &&
-                targetPoint.y >= top + safetyInset &&
-                targetPoint.y <= bottom - safetyInset
-        val endpointsInZones =
-            originPoint.y >= originZoneMinY - zoneTolerancePx &&
-                targetPoint.y <= targetZoneMaxY + zoneTolerancePx
-        return routeVisible && endpointsVisible && (!requireZones || endpointsInZones)
-    }
-
-    private fun buildConstrainedCamera(
-        map: MapLibreMap,
-        baseCamera: CameraPosition,
-        zoom: Double,
-        routeStart: LatLng,
-        missionTarget: LatLng,
-        originZoneMinY: Float,
-        targetZoneMaxY: Float,
-        desiredCenterX: Float,
-        desiredCenterY: Float,
-        anchorX: Float,
-        anchorY: Float,
-        requireZones: Boolean,
-    ): CameraPosition {
-        val zoomCamera = CameraPosition.Builder(baseCamera)
-            .zoom(zoom)
-            .build()
-        map.moveCamera(CameraUpdateFactory.newCameraPosition(zoomCamera))
-
-        val originPoint = map.projection.toScreenLocation(routeStart)
-        val targetPoint = map.projection.toScreenLocation(missionTarget)
-        val currentMidX = (originPoint.x + targetPoint.x) / 2f
-        val currentMidY = (originPoint.y + targetPoint.y) / 2f
-        val deltaX = desiredCenterX - currentMidX
-        val deltaY = if (requireZones) {
-            val minDeltaY = originZoneMinY - originPoint.y
-            val maxDeltaY = targetZoneMaxY - targetPoint.y
-            val preferredDeltaY = originZoneMinY - originPoint.y
-            if (minDeltaY <= maxDeltaY) {
-                preferredDeltaY.coerceIn(minDeltaY, maxDeltaY)
-            } else {
-                preferredDeltaY
-            }
-        } else {
-            desiredCenterY - currentMidY
-        }
-        val shiftedTarget = map.projection.fromScreenLocation(
-            PointF(anchorX - deltaX, anchorY - deltaY),
-        )
-        return CameraPosition.Builder(map.cameraPosition)
-            .target(shiftedTarget)
-            .zoom(zoom)
-            .build()
-    }
-
-    private fun computeRouteCenter(points: List<LatLng>): LatLng {
-        val latMin = points.minOf { it.latitude }
-        val latMax = points.maxOf { it.latitude }
-        val lonMin = points.minOf { it.longitude }
-        val lonMax = points.maxOf { it.longitude }
-        return LatLng(
-            (latMin + latMax) / 2.0,
-            (lonMin + lonMax) / 2.0,
-        )
-    }
-
-    private fun bearingBetween(start: LatLng, end: LatLng): Double {
-        val startLat = Math.toRadians(start.latitude)
-        val startLon = Math.toRadians(start.longitude)
-        val endLat = Math.toRadians(end.latitude)
-        val endLon = Math.toRadians(end.longitude)
-        val deltaLon = endLon - startLon
-        val y = kotlin.math.sin(deltaLon) * kotlin.math.cos(endLat)
-        val x = kotlin.math.cos(startLat) * kotlin.math.sin(endLat) -
-            kotlin.math.sin(startLat) * kotlin.math.cos(endLat) * kotlin.math.cos(deltaLon)
-        return (Math.toDegrees(kotlin.math.atan2(y, x)) + 360.0) % 360.0
-    }
-
-    private fun loadBitmapFromAssets(context: Context, path: String): android.graphics.Bitmap? {
-        return runCatching {
-            context.assets.open(path).use { stream ->
-                android.graphics.BitmapFactory.decodeStream(stream)
-            }
-        }.getOrNull()
-    }
-
-    private fun normalizeDegrees(value: Double): Double {
-        return ((value % 360.0) + 360.0) % 360.0
-    }
 
     private fun looksLikeCentralEurope(target: LatLng): Boolean {
         return target.latitude in 47.0..56.5 && target.longitude in 5.0..16.5
@@ -1454,86 +938,4 @@ class KidNativeMapController(
         val playerPoint: LatLng,
         val remainingWaypoints: List<com.cachekid.companion.host.mission.MissionWaypoint>,
     )
-
-    //region Camera mode
-
-    fun setCameraMode(mode: KidMapCameraPlanner.CameraMode) {
-        if (cameraMode == mode) return
-        cameraMode = mode
-        updateCameraModeToggleIcon()
-        updateCamera(animate = true)
-    }
-
-    private fun toggleCameraMode() {
-        val newMode = when (cameraMode) {
-            KidMapCameraPlanner.CameraMode.ROUTE_OVERVIEW -> KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP
-            KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP -> KidMapCameraPlanner.CameraMode.ROUTE_OVERVIEW
-        }
-        setCameraMode(newMode)
-    }
-
-    private fun updateCameraModeToggleIcon() {
-        val toggle = cameraModeToggleView ?: return
-        val bitmap = when (cameraMode) {
-            KidMapCameraPlanner.CameraMode.ROUTE_OVERVIEW -> buildOverviewIconBitmap()
-            KidMapCameraPlanner.CameraMode.FOLLOW_HEADING_UP -> buildFollowIconBitmap()
-        }
-        toggle.setImageBitmap(bitmap)
-    }
-
-    private fun buildOverviewIconBitmap(): Bitmap {
-        val bitmap = Bitmap.createBitmap(120, 120, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            style = Paint.Style.STROKE
-            strokeWidth = 14f
-        }
-        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.BLACK
-            style = Paint.Style.STROKE
-            strokeWidth = 10f
-        }
-        // Map rectangle
-        canvas.drawRect(24f, 24f, 96f, 96f, halo)
-        canvas.drawRect(24f, 24f, 96f, 96f, ink)
-        // Crosshair
-        canvas.drawLine(60f, 34f, 60f, 86f, ink)
-        canvas.drawLine(34f, 60f, 86f, 60f, ink)
-        return bitmap
-    }
-
-    private fun buildFollowIconBitmap(): Bitmap {
-        val bitmap = Bitmap.createBitmap(120, 120, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            style = Paint.Style.STROKE
-            strokeWidth = 14f
-        }
-        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.BLACK
-            style = Paint.Style.STROKE
-            strokeWidth = 10f
-        }
-        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.BLACK
-            style = Paint.Style.FILL
-        }
-        // Triangle pointing up
-        val path = Path().apply {
-            moveTo(60f, 20f)
-            lineTo(100f, 100f)
-            lineTo(20f, 100f)
-            close()
-        }
-        canvas.drawPath(path, halo)
-        canvas.drawPath(path, ink)
-        canvas.drawPath(path, fill)
-        // White dot in center
-        canvas.drawCircle(60f, 70f, 14f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE })
-        return bitmap
-    }
-
-    //endregion
 }
