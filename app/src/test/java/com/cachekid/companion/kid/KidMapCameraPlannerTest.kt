@@ -353,6 +353,45 @@ class KidMapCameraPlannerTest {
     }
 
     @Test
+    fun `hasArrived returns true when within threshold`() {
+        val targetLat = 52.52
+        val targetLon = 13.405
+        // 10 Meter nördlich des Targets
+        val playerLat = 52.52009
+        val playerLon = 13.405
+
+        assertTrue(
+            planner.hasArrived(playerLat, playerLon, targetLat, targetLon, thresholdMeters = 15.0),
+        )
+    }
+
+    @Test
+    fun `hasArrived returns false when beyond threshold`() {
+        val targetLat = 52.52
+        val targetLon = 13.405
+        // 100 Meter nördlich des Targets
+        val playerLat = 52.5209
+        val playerLon = 13.405
+
+        assertFalse(
+            planner.hasArrived(playerLat, playerLon, targetLat, targetLon, thresholdMeters = 15.0),
+        )
+    }
+
+    @Test
+    fun `hasArrived uses default threshold of 15 meters`() {
+        val targetLat = 52.52
+        val targetLon = 13.405
+        // 12 Meter nördlich — innerhalb von 15m, außerhalb von 5m
+        val playerLat = 52.52011
+        val playerLon = 13.405
+
+        assertTrue(
+            planner.hasArrived(playerLat, playerLon, targetLat, targetLon),
+        )
+    }
+
+    @Test
     fun `plan handles null location and null mission gracefully`() {
         val plan = planner.plan(
             CameraMode.FOLLOW_HEADING_UP,
