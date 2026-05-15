@@ -304,6 +304,20 @@ class KidMapCameraPlanner {
         val diff = kotlin.math.abs(normalizeDegrees(a) - normalizeDegrees(b))
         return if (diff > 180.0) 360.0 - diff else diff
     }
+
+    /**
+     * Prüft, ob der Spieler das Ziel erreicht hat.
+     * Threshold: 15 Meter (konfigurierbar, default aus Issue #58).
+     */
+    fun hasArrived(
+        playerLat: Double,
+        playerLon: Double,
+        targetLat: Double,
+        targetLon: Double,
+        thresholdMeters: Double = 15.0,
+    ): Boolean {
+        return haversineDistance(playerLat, playerLon, targetLat, targetLon) <= thresholdMeters
+    }
 }
 
 data class LocationSnapshot(

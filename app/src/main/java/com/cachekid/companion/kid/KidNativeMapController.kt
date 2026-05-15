@@ -95,6 +95,8 @@ class KidNativeMapController(
     private val cameraPlanner = KidMapCameraPlanner()
     private var currentCameraMode: CameraMode = CameraMode.ROUTE_OVERVIEW
     private lateinit var cameraModeToggleView: android.widget.TextView
+    private val arrivalImageView: ImageView
+    private var isArrivalShowing = false
 
     init {
         MapLibre.getInstance(context.applicationContext)
@@ -159,6 +161,19 @@ class KidNativeMapController(
         }
         overlayContainer.addView(cameraModeToggleView)
         cameraModeToggleView.bringToFront()
+
+        // Arrival overlay (cacheClose.png) – fullscreen, hidden by default
+        arrivalImageView = ImageView(context).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            )
+            visibility = View.GONE
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setImageBitmap(loadBitmapFromAssets(context, "web/cacheClose.png"))
+        }
+        overlayContainer.addView(arrivalImageView)
+        arrivalImageView.bringToFront()
     }
 
     fun onCreate(savedInstanceState: android.os.Bundle?) {
@@ -229,6 +244,7 @@ class KidNativeMapController(
             "updateLocation raw=${location?.latitude},${location?.longitude} accuracy=${location?.accuracy} bearing=${location?.bearing}",
         )
         updateMissionOverlays()
+        checkArrival()
         updateCameraFromPlan(animate = true)
     }
 
@@ -865,6 +881,33 @@ class KidNativeMapController(
             result,
         )
         return result[0].toDouble()
+    }
+
+    private fun checkArrival() {
+        val location = currentLocation ?: return
+        val mission = currentMission ?: return
+        val hasArrived = cameraPlanner.hasArrived(
+            playerLat = location.latitude,
+            playerLon = location.longitude,
+            targetLat = mission.target.latitude,
+            targetLon = mission.target.longitude,
+        )
+        if (hasArrived && !isArrivalShowing) {
+            isArrivalShowing = true
+            arrivalImageView.visibility = View.VISIBLE
+            arrivalImageView.bringToFront()
+        } else if (!hasArrived && isArrivalShowing) {
+            isArrivalShowing = false
+            arrivalImageView.visibility = View.GONE
+        }
+    }
+
+    private fun loadBitmapFromAssets(context: Context, path: String): Bitmap? {
+        return runCatching {
+            context.assets.open(path).use { stream ->
+                android.graphics.BitmapFactory.decodeStream(stream)
+            }
+        }.getOrNull()
     }
 
     private fun buildMissingOfflineMapStyleJson(): String {
