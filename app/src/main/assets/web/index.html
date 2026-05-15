@@ -10,24 +10,26 @@
   <main class="app-shell">
     <section id="kidMissionView" class="kid-mission" hidden>
       <section class="kid-compass-panel">
-        <div class="kid-compass-shell">
-          <div class="kid-compass-ring">
-            <img class="kid-compass-base" src="./compass.png" alt="" aria-hidden="true" />
-            <div id="kidCompassDialRotor" class="kid-compass-dial-rotor" aria-hidden="true">
-              <img id="kidCompassDial" class="kid-compass-dial" src="./compass-ziffernblatt.png" alt="" aria-hidden="true" />
-              <div class="kid-cardinal kid-cardinal--north">N</div>
-              <div class="kid-cardinal kid-cardinal--east">O</div>
-              <div class="kid-cardinal kid-cardinal--south">S</div>
-              <div class="kid-cardinal kid-cardinal--west">W</div>
+        <div class="kid-compass-row">
+          <div class="kid-compass-shell">
+            <div class="kid-compass-ring">
+              <img class="kid-compass-base" src="./compass.png" alt="" aria-hidden="true" />
+              <div id="kidCompassDialRotor" class="kid-compass-dial-rotor" aria-hidden="true">
+                <img id="kidCompassDial" class="kid-compass-dial" src="./compass-ziffernblatt.png" alt="" aria-hidden="true" />
+                <div class="kid-cardinal kid-cardinal--north">N</div>
+                <div class="kid-cardinal kid-cardinal--east">O</div>
+                <div class="kid-cardinal kid-cardinal--south">S</div>
+                <div class="kid-cardinal kid-cardinal--west">W</div>
+              </div>
+              <div id="kidCompassNeedle" class="kid-compass-needle" hidden></div>
             </div>
-            <div id="kidCompassNeedle" class="kid-compass-needle" hidden></div>
           </div>
-        </div>
 
-        <div class="kid-distance-cluster">
-          <div id="kidDistanceValue" class="kid-distance-value">--</div>
-          <div class="kid-distance-scale">
-            <span id="kidDistanceScaleFill"></span>
+          <div class="kid-distance-cluster">
+            <div id="kidDistanceValue" class="kid-distance-value">--</div>
+            <div class="kid-distance-scale">
+              <span id="kidDistanceScaleFill"></span>
+            </div>
           </div>
         </div>
 

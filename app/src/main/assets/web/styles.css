@@ -76,11 +76,11 @@ body.native-map-mode .kid-mission {
 
 .kid-distance-cluster {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0;
-  margin-top: 14px;
-  margin-bottom: 0;
+  gap: 4px;
+  margin: 0;
 }
 
 .kid-heading-debug {
@@ -88,16 +88,26 @@ body.native-map-mode .kid-mission {
 }
 
 .kid-distance-value {
-  font-size: clamp(2.1rem, 8vw, 3.6rem);
+  font-size: clamp(1.8rem, 6vw, 2.8rem);
   line-height: 1;
   font-weight: 700;
   letter-spacing: 0.04em;
   color: #000000;
   background: #ffffff;
-  padding: 8px 22px;
+  padding: 8px 18px;
   border-radius: 999px;
   border: 3px solid #000000;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  min-height: 44px;
+}
+
+.kid-distance-value svg {
+  width: 28px;
+  height: 28px;
+  display: block;
 }
 
 .kid-distance-scale {
@@ -108,9 +118,17 @@ body.native-map-mode .kid-mission {
   display: none;
 }
 
+.kid-compass-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
 .kid-compass-shell {
   display: grid;
   place-items: center;
+  flex-shrink: 0;
 }
 
 .kid-compass-ring {
@@ -213,18 +231,20 @@ body.kid-mode .kid-map-panel {
   box-shadow: none;
 }
 
-body.kid-mode .kid-compass-panel {
-  min-height: 33vh;
-  max-height: 33vh;
-  margin: 0;
-  padding: 4px 16px 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(255, 255, 255, 0.96) 48%, rgba(255, 255, 255, 0.48) 82%, rgba(255, 255, 255, 0) 100%);
+body.kid-mode {
   overflow: hidden;
+  touch-action: none;
+}
+
+body.kid-mode .kid-compass-panel {
+  min-height: auto;
+  margin: 0;
+  padding: 8px 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(255, 255, 255, 0.96) 48%, rgba(255, 255, 255, 0.48) 82%, rgba(255, 255, 255, 0) 100%);
 }
 
 body.kid-mode .kid-map-panel {
-  min-height: 67vh;
-  background: transparent;
+  display: none;
 }
 
 body.native-map-mode .kid-map-panel {
