@@ -214,14 +214,16 @@ body.kid-mode .kid-map-panel {
 }
 
 body.kid-mode .kid-compass-panel {
-  min-height: 28vh;
+  min-height: 33vh;
+  max-height: 33vh;
   margin: 0;
-  padding: 4px 16px 22px;
+  padding: 4px 16px 0;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(255, 255, 255, 0.96) 48%, rgba(255, 255, 255, 0.48) 82%, rgba(255, 255, 255, 0) 100%);
+  overflow: hidden;
 }
 
 body.kid-mode .kid-map-panel {
-  min-height: 72vh;
+  min-height: 67vh;
   background: transparent;
 }
 
