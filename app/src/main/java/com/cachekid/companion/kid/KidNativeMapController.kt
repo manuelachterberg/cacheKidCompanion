@@ -84,6 +84,7 @@ class KidNativeMapController(
     private var currentLocation: Location? = null
     private var currentHeadingDegrees: Float? = null
     private var lastAppliedBearingDegrees: Double? = null
+    private var lastLogScreenPositionsAtMillis: Long = 0L
     private var displayedMissionId: String? = null
     private var displayedRouteStart: LatLng? = null
     private var displayedStyleKey: String? = null
@@ -458,17 +459,18 @@ class KidNativeMapController(
             "updateCameraFromPlan mode=${plan.mode} bearing=${plan.bearing} zoom=${plan.zoom} animate=$animate",
         )
 
-        if (animate) {
-            map.animateCamera(update)
-        } else {
-            map.moveCamera(update)
-        }
-        logScreenPositions()
+        // E-Ink: keine Animation, sofortiger scharfer Wechsel vermeidet Ghosting
+        map.moveCamera(update)
+        logScreenPositionsThrottled()
 
         lastAppliedBearingDegrees = plan.bearing
     }
 
-    private fun logScreenPositions() {
+    private fun logScreenPositionsThrottled() {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastLogScreenPositionsAtMillis < 5000L) return
+        lastLogScreenPositionsAtMillis = now
+
         val map = mapLibreMap ?: return
         val mission = currentMission ?: return
         val playerLatLng = resolveDisplayRouteStart(mission)

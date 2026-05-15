@@ -1277,8 +1277,9 @@ class MainActivity : AppCompatActivity() {
             binding.kidTopWhiteInset.visibility = View.VISIBLE
             binding.kidZoneDebugOverlay.visibility = View.GONE
             layoutParams.width = FrameLayout.LayoutParams.MATCH_PARENT
-            layoutParams.height = (resources.displayMetrics.heightPixels * 0.45f).toInt()
+            layoutParams.height = FrameLayout.LayoutParams.WRAP_CONTENT
             layoutParams.gravity = android.view.Gravity.TOP
+            binding.webView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
             binding.webView.layoutParams = layoutParams
             binding.webView.bringToFront()
         } else {
@@ -1288,6 +1289,7 @@ class MainActivity : AppCompatActivity() {
             layoutParams.width = FrameLayout.LayoutParams.MATCH_PARENT
             layoutParams.height = FrameLayout.LayoutParams.MATCH_PARENT
             layoutParams.gravity = android.view.Gravity.TOP
+            binding.webView.setBackgroundColor(android.graphics.Color.WHITE)
             binding.webView.layoutParams = layoutParams
         }
     }
