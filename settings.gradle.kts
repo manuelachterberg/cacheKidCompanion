@@ -19,3 +19,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "CacheKidCompanion"
 include(":app")
+include(":shared")
