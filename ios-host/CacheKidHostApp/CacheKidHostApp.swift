@@ -20,4 +20,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         }
         return false
     }
+    
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        print("[AppDelegate] applicationDidBecomeActive")
+        NotificationCenter.default.post(name: .init("CheckPendingShare"), object: nil)
+    }
 }

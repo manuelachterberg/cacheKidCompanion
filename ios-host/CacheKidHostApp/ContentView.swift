@@ -2,11 +2,14 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var viewModel = ImportViewModel()
+    @State private var checkTimer: Timer?
     
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
-                if let mission = viewModel.importedMission {
+                if viewModel.isImporting {
+                    ProgressView("Importiere Cache...")
+                } else if let mission = viewModel.importedMission {
                     MissionBuilderView(mission: mission)
                 } else {
                     VStack(spacing: 16) {
@@ -22,6 +25,7 @@ struct ContentView: View {
                             .multilineTextAlignment(.center)
                             .foregroundColor(.secondary)
                             .padding(.horizontal)
+                        
                     }
                     .padding()
                 }
@@ -29,6 +33,12 @@ struct ContentView: View {
             .navigationTitle("CacheKid Host")
         }
         .onAppear {
+            viewModel.checkForPendingShare()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            viewModel.checkForPendingShare()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             viewModel.checkForPendingShare()
         }
     }

@@ -8,13 +8,16 @@ class ShareViewController: SLComposeServiceViewController {
     private var sharedURL: URL?
     private var sharedText: String?
     
+    private let appGroupIdentifier = "group.com.cachekid.companion"
+    private let pendingShareFilename = "pending-share.json"
+    
     override func isContentValid() -> Bool {
         return true
     }
     
     override func didSelectPost() {
         extractSharedContent { [weak self] in
-            self?.processSharedContent()
+            self?.saveSharedContent()
             self?.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
         }
     }
@@ -59,28 +62,37 @@ class ShareViewController: SLComposeServiceViewController {
         }
     }
     
-    private func processSharedContent() {
-        guard let text = sharedText ?? sharedURL?.absoluteString else { return }
-        
-        // Store shared content in shared UserDefaults for main app to pick up
-        let sharedDefaults = UserDefaults(suiteName: "group.com.cachekid.companion")
-        sharedDefaults?.set(text, forKey: "pendingShareContent")
-        sharedDefaults?.set(Date().timeIntervalSince1970, forKey: "pendingShareTimestamp")
-        
-        // Open main app
-        if let url = URL(string: "cachekid://import") {
-            _ = openURL(url)
+    private func saveSharedContent() {
+        var parts: [String] = []
+        if let text = sharedText, !text.isEmpty {
+            parts.append(text)
         }
-    }
-    
-    @objc private func openURL(_ url: URL) -> Bool {
-        var responder: UIResponder? = self
-        while responder != nil {
-            if let application = responder as? UIApplication {
-                return application.perform(#selector(UIApplication.open(_:options:completionHandler:)), with: url, with: [:]) != nil
-            }
-            responder = responder?.next
+        if let url = sharedURL?.absoluteString, !url.isEmpty {
+            parts.append(url)
         }
-        return false
+        
+        guard !parts.isEmpty else { return }
+        
+        let combined = parts.joined(separator: "\n")
+        
+        let payload: [String: Any] = [
+            "content": combined,
+            "timestamp": Date().timeIntervalSince1970
+        ]
+        
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier) else {
+            print("[ShareExt] Failed to get app group container URL")
+            return
+        }
+        
+        let fileURL = containerURL.appendingPathComponent(pendingShareFilename)
+        
+        do {
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted])
+            try data.write(to: fileURL, options: [.atomic])
+            print("[ShareExt] Saved share content to: \(fileURL.path)")
+        } catch {
+            print("[ShareExt] Failed to write share content: \(error)")
+        }
     }
 }
